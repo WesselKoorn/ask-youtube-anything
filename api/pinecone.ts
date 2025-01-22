@@ -27,3 +27,27 @@ export async function uploadVideos(videos: YoutubeVideoModel[]): Promise<void> {
     throw error;
   }
 }
+
+export async function askQuestion(
+  channelId: string,
+  question: string
+): Promise<void> {
+  if (!process.env.PINECONE_API_KEY) {
+    throw new Error("PINECONE_API_KEY is not set");
+  }
+
+  if (!process.env.PINECONE_INDEX_NAME) {
+    throw new Error("PINECONE_INDEX_NAME is not set");
+  }
+
+  const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
+  const matches = await PineconeEmbeddingService.queryChannel(
+    question,
+    channelId,
+    pinecone,
+    process.env.PINECONE_INDEX_NAME
+  );
+
+  console.log(matches);
+}

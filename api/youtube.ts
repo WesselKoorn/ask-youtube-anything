@@ -2,13 +2,8 @@
 
 import { YoutubeService } from "@api/services/youtube-service";
 import { YoutubeVideoModel } from "@models/youtube-video-model";
-/**
- * Main function to get the 10 latest videos from a channel URL like:
- *   https://www.youtube.com/@AlexHormozi/featured
- */
-export async function getLast10Videos(
-  formData: FormData
-): Promise<YoutubeVideoModel[]> {
+
+export async function getChannelId(formData: FormData): Promise<string> {
   try {
     const channelUrl = formData.get("channelUrl") as string;
 
@@ -28,6 +23,26 @@ export async function getLast10Videos(
 
     if (!channelId) {
       throw new Error(`Channel not found for handle: ${handle}`);
+    }
+
+    return channelId;
+  } catch (error) {
+    console.error(error);
+
+    throw error;
+  }
+}
+
+/**
+ * Main function to get the 10 latest videos from a channel URL like:
+ *   https://www.youtube.com/@AlexHormozi/featured
+ */
+export async function getLast10Videos(
+  channelId: string
+): Promise<YoutubeVideoModel[]> {
+  try {
+    if (!channelId) {
+      throw new Error("Channel ID is required");
     }
 
     // 3. From the channelId, retrieve the "uploads" playlist ID
