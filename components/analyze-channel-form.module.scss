@@ -1,10 +1,27 @@
 .component {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 32px;
+}
+
+.description {
+  text-align: center;
+  font-size: 16px;
+  color: var(--gray-alpha-500);
 }
 
 .form {
   display: flex;
-  gap: 10px;
+  gap: 16px;
+  width: 80%;
+}
+
+.input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: none;
+  background-color: var(--gray-alpha-200);
+  color: var(--foreground);
 }

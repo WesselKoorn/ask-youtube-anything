@@ -3,8 +3,8 @@
 import styles from "./analyze-channel-form.module.scss";
 
 import { analyzeChannel } from "app/actions";
-import { useFormStatus } from "react-dom";
 import { useState } from "react";
+import SubmitButton from "@components/submit-button";
 
 export default function AnalyzeChannelForm() {
   const [error, setError] = useState<string | null>(null);
@@ -19,20 +19,19 @@ export default function AnalyzeChannelForm() {
     }
   }
 
-  function SubmitButton() {
-    const { pending } = useFormStatus();
-
-    return (
-      <button type="submit" disabled={pending}>
-        {pending ? "Analyzing..." : "Get Videos"}
-      </button>
-    );
-  }
-
   return (
     <div className={styles.component}>
+      <p className={styles.description}>
+        Enter the URL of the YouTube channel you want to analyze (e.g.
+        https://www.youtube.com/@AlexHormozi/)
+      </p>
       <form className={styles.form} action={handleSubmit}>
-        <input type="text" name="channelUrl" />
+        <input
+          className={styles.input}
+          type="text"
+          name="channelUrl"
+          placeholder="Enter a YouTube channel URL"
+        />
         <SubmitButton />
       </form>
       {error && (

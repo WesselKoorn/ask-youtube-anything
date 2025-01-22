@@ -3,6 +3,7 @@
   --foreground: #171717;
 
   --gray-rgb: 0, 0, 0;
+  --gray-alpha-500: rgba(var(--gray-rgb), 0.3);
   --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
 
@@ -16,6 +17,7 @@
     --foreground: #ededed;
 
     --gray-rgb: 255, 255, 255;
+    --gray-alpha-500: rgba(var(--gray-rgb), 0.3);
     --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
     --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
 
