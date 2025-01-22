@@ -165,4 +165,41 @@ export class YoutubeService {
 
     return transcriptionArray.map((item) => item.text).join(" ");
   }
+
+  /**
+   * Get the channel name from a channel ID using the YouTube Data API
+   */
+  static async getChannelName(channelId: string): Promise<string> {
+    try {
+      const channelResponse = await fetch(
+        `${YOUTUBE_DATA_API_URL}/channels?` +
+          new URLSearchParams({
+            part: "snippet",
+            id: channelId,
+            key: YOUTUBE_DATA_API_KEY,
+          }).toString()
+      );
+
+      if (!channelResponse.ok) {
+        console.error(
+          `YouTube channels API error: ${channelResponse.status} ${channelResponse.statusText}`
+        );
+
+        throw new Error("Failed to fetch channel name");
+      }
+
+      const data = await channelResponse.json();
+      const channel = data.items?.[0];
+
+      if (!channel?.snippet?.title) {
+        throw new Error("Channel not found");
+      }
+
+      return channel.snippet.title;
+    } catch (error) {
+      console.error(error);
+
+      return "";
+    }
+  }
 }

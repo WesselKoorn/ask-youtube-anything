@@ -1,12 +1,90 @@
-.answerContainer {
+.component {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.header {
+  align-self: flex-start;
+}
+
+.messages {
+  display: flex;
+  height: 80vh;
+  width: 80%;
+  overflow-y: auto;
+}
+
+.messagesInner {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.test {
+  background-color: aqua;
+  height: 2000px;
+  width: 200px;
+}
+
+.userMessage {
+  align-self: flex-end;
+  background-color: var(--gray-alpha-200);
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.chatbotMessage {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: 20px;
+
+  .answer {
+    white-space: pre-line;
+  }
+
+  .referencesTitle {
+    font-weight: bold;
+  }
+
+  .references {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 
-.answer {
-  white-space: pre-line;
+.form {
+  display: flex;
+  gap: 16px;
+  width: 80%;
+}
+
+.input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: none;
+  background-color: var(--gray-alpha-200);
+  color: var(--foreground);
+}
+
+.submitButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: var(--foreground);
+  color: var(--background);
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
 }
 
 .error {
