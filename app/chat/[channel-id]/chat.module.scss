@@ -1,0 +1,15 @@
+.answerContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.answer {
+  white-space: pre-line;
+}
+
+.error {
+  color: red;
+  margin: 1rem 0;
+}

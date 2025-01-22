@@ -34,27 +34,6 @@
   grid-row-start: 2;
 }
 
-.answerContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.answer {
-  white-space: pre-line;
-}
-
-.videos {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.transcription {
-  margin-top: 20px;
-}
-
 a.primary {
   background: var(--foreground);
   color: var(--background);

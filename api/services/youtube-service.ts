@@ -119,8 +119,6 @@ export class YoutubeService {
 
     const data = await playlistResponse.json();
 
-    console.log("Items:", data.items);
-
     const videos: YoutubeVideo[] =
       data.items?.map(
         (item: {

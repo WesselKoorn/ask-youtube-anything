@@ -3,10 +3,8 @@
 import { YoutubeService } from "@api/services/youtube-service";
 import { YoutubeVideo } from "@models/youtube-video";
 
-export async function getChannelId(formData: FormData): Promise<string> {
+export async function getChannelId(channelUrl: string): Promise<string> {
   try {
-    const channelUrl = formData.get("channelUrl") as string;
-
     if (!channelUrl) {
       throw new Error("Channel URL is required");
     }
