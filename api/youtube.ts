@@ -58,6 +58,7 @@ export async function getLast10Videos(
     return videos;
   } catch (error) {
     console.error(error);
+
     throw error;
   }
 }

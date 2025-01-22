@@ -4,12 +4,14 @@ import { useState } from "react";
 import styles from "./page.module.scss";
 import { getLast10Videos } from "@api/youtube";
 import { YoutubeVideoModel } from "@models/youtube-video-model";
+import { uploadVideos } from "@api/pinecone";
 
 export default function Home() {
   const [videos, setVideos] = useState<YoutubeVideoModel[]>([]);
   return (
     <div className={styles.page}>
       <main className={styles.main}>
+        <p>https://www.youtube.com/@AlexHormozi/featured</p>
         <form
           action={async (formData: FormData) => {
             try {
@@ -17,6 +19,8 @@ export default function Home() {
               console.log("Videos:", videos);
 
               setVideos(videos);
+
+              await uploadVideos(videos);
             } catch (error) {
               console.error("Error:", error);
             }
