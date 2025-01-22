@@ -1,7 +1,7 @@
 "use server";
 
 import { YoutubeService } from "@api/services/youtube-service";
-import { YoutubeVideoModel } from "@models/youtube-video-model";
+import { YoutubeVideo } from "@models/youtube-video";
 
 export async function getChannelId(formData: FormData): Promise<string> {
   try {
@@ -39,7 +39,7 @@ export async function getChannelId(formData: FormData): Promise<string> {
  */
 export async function getLast10Videos(
   channelId: string
-): Promise<YoutubeVideoModel[]> {
+): Promise<YoutubeVideo[]> {
   try {
     if (!channelId) {
       throw new Error("Channel ID is required");

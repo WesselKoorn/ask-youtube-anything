@@ -1,4 +1,4 @@
-export interface YoutubeVideoModel {
+export interface YoutubeVideo {
   title: string;
   description: string;
   thumbnailUrl: string;

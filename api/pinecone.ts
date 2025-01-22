@@ -1,10 +1,11 @@
 "use server";
 
-import { YoutubeVideoModel } from "@models/youtube-video-model";
+import { YoutubeVideo } from "@models/youtube-video";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { PineconeEmbeddingService } from "@api/services/pinecone-embeddings-service";
+import { PineconeSearchResult } from "@models/pinecone-search-result";
 
-export async function uploadVideos(videos: YoutubeVideoModel[]): Promise<void> {
+export async function uploadVideos(videos: YoutubeVideo[]): Promise<void> {
   try {
     if (!process.env.PINECONE_API_KEY) {
       throw new Error("PINECONE_API_KEY is not set");
@@ -31,7 +32,7 @@ export async function uploadVideos(videos: YoutubeVideoModel[]): Promise<void> {
 export async function askQuestion(
   channelId: string,
   question: string
-): Promise<void> {
+): Promise<PineconeSearchResult[]> {
   if (!process.env.PINECONE_API_KEY) {
     throw new Error("PINECONE_API_KEY is not set");
   }
@@ -49,5 +50,5 @@ export async function askQuestion(
     process.env.PINECONE_INDEX_NAME
   );
 
-  console.log(matches);
+  return matches;
 }

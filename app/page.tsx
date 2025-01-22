@@ -3,12 +3,13 @@
 import { useState } from "react";
 import styles from "./page.module.scss";
 import { getChannelId, getLast10Videos } from "@api/youtube";
-import { YoutubeVideoModel } from "@models/youtube-video-model";
 import { askQuestion, uploadVideos } from "@api/pinecone";
+import { ChatbotAnswer } from "@models/chatbot-answer";
+import { getAnswer } from "@api/chatbot";
 
 export default function Home() {
   const [channelId, setChannelId] = useState<string>("");
-  const [videos, setVideos] = useState<YoutubeVideoModel[]>([]);
+  const [answer, setAnswer] = useState<ChatbotAnswer | null>(null);
 
   return (
     <div className={styles.page}>
@@ -25,7 +26,6 @@ export default function Home() {
               await uploadVideos(videos);
 
               setChannelId(channelId);
-              setVideos(videos);
             } catch (error) {
               console.error("Error:", error);
             }
@@ -45,7 +45,10 @@ export default function Home() {
                   throw new Error("Question is required");
                 }
 
-                await askQuestion(channelId, question);
+                const searchResults = await askQuestion(channelId, question);
+                const answer = await getAnswer(question, searchResults);
+
+                setAnswer(answer);
               } catch (error) {
                 console.error("Error:", error);
               }
@@ -56,14 +59,22 @@ export default function Home() {
           </form>
         )}
 
-        <div className={styles.videos}>
-          {videos.map((video) => (
-            <div key={video.videoId} className={styles.video}>
-              <h2>{video.title}</h2>
-              <p className={styles.transcription}>{video.transcription}</p>
-            </div>
-          ))}
-        </div>
+        {answer && (
+          <div className={styles.answerContainer}>
+            <p className={styles.answer}>{answer.answer}</p>
+
+            <p>References:</p>
+            <ul>
+              {answer.references.map((reference) => (
+                <li key={reference.videoId}>
+                  <a href={reference.link} target="_blank">
+                    {reference.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </main>
     </div>
   );

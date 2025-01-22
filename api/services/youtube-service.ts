@@ -1,4 +1,4 @@
-import { YoutubeVideoModel } from "@models/youtube-video-model";
+import { YoutubeVideo } from "@models/youtube-video";
 import { YoutubeTranscript } from "youtube-transcript";
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
@@ -98,7 +98,7 @@ export class YoutubeService {
   static async fetchPlaylistVideos(
     playlistId: string,
     maxResults: number
-  ): Promise<YoutubeVideoModel[]> {
+  ): Promise<YoutubeVideo[]> {
     const playlistResponse = await fetch(
       `${YOUTUBE_DATA_API_URL}/playlistItems?` +
         new URLSearchParams({
@@ -121,7 +121,7 @@ export class YoutubeService {
 
     console.log("Items:", data.items);
 
-    const videos: YoutubeVideoModel[] =
+    const videos: YoutubeVideo[] =
       data.items?.map(
         (item: {
           id: string;
@@ -138,7 +138,7 @@ export class YoutubeService {
             };
           };
         }) => {
-          const video: YoutubeVideoModel = {
+          const video: YoutubeVideo = {
             title: item.snippet.title,
             description: item.snippet.description,
             thumbnailUrl: item.snippet.thumbnails.high.url,

@@ -1,4 +1,5 @@
-import { YoutubeVideoModel } from "@models/youtube-video-model";
+import { PineconeSearchResult } from "@models/pinecone-search-result";
+import { YoutubeVideo } from "@models/youtube-video";
 import {
   Pinecone,
   RecordMetadata,
@@ -18,34 +19,19 @@ interface VideoChunk {
   publishedAt: string;
 }
 
-/**
- * Search result from Pinecone
- */
-interface SearchResult {
-  id: string;
-  score: number;
-  metadata: {
-    channelId: string;
-    videoId: string;
-    text?: string;
-    title?: string;
-    publishedAt?: string;
-  };
-}
-
 export class PineconeEmbeddingService {
   private static CHUNK_SIZE = 500; // tokens or ~words; adjust as needed
 
   /**
    * Splits each video's transcription into chunks, generates embeddings,
    * and upserts them to Pinecone (skipping duplicates if they exist).
-   * @param videos Array of YoutubeVideoModel
+   * @param videos Array of YoutubeVideo
    * @param openAiApiKey Your OpenAI API key
    * @param pineconeClient An initialized Pinecone
    * @param pineconeIndexName The name of your Pinecone index
    */
   static async chunkAndUpsertVideos(
-    videos: YoutubeVideoModel[],
+    videos: YoutubeVideo[],
     pineconeClient: Pinecone,
     pineconeIndexName: string
   ): Promise<void> {
@@ -222,7 +208,7 @@ export class PineconeEmbeddingService {
     pineconeClient: Pinecone,
     pineconeIndexName: string,
     topK = 5
-  ): Promise<SearchResult[]> {
+  ): Promise<PineconeSearchResult[]> {
     // 1) Embed the question
     const [questionEmbedding] = await PineconeEmbeddingService.embedTexts([
       question,
@@ -242,7 +228,7 @@ export class PineconeEmbeddingService {
     const queryResponse = await index.query(queryRequest);
 
     // 3) Transform response to a typed SearchResult array
-    const matches: SearchResult[] =
+    const matches: PineconeSearchResult[] =
       queryResponse.matches?.map(
         (match: ScoredPineconeRecord<RecordMetadata>) => ({
           id: match.id,
