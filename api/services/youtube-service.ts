@@ -152,12 +152,26 @@ export class YoutubeService {
     return videos;
   }
 
-  static async getTranscriptions(videoIds: string[]): Promise<string[]> {
-    const transcriptions = await Promise.all(
-      videoIds.map((videoId) => this.getTranscript(videoId))
+  static async getTranscriptions(videoIds: string[]): Promise<
+    {
+      videoId: string;
+      transcription: string | undefined;
+    }[]
+  > {
+    const transcriptions = await Promise.allSettled(
+      videoIds.map(async (videoId) => {
+        return {
+          videoId,
+          transcription: await this.getTranscript(videoId),
+        };
+      })
     );
 
-    return transcriptions;
+    const results = transcriptions
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value);
+
+    return results;
   }
 
   static async getTranscript(videoId: string): Promise<string> {

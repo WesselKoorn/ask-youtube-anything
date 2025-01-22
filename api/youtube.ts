@@ -3,6 +3,8 @@
 import { YoutubeService } from "@api/services/youtube-service";
 import { YoutubeVideo } from "@models/youtube-video";
 
+const MAX_VIDEOS = 100;
+
 export async function getChannelId(channelUrl: string): Promise<string> {
   try {
     if (!channelUrl) {
@@ -57,15 +59,19 @@ export async function getLast10Videos(
     // 4. Fetch last 10 videos from the uploads playlist
     const videos = await YoutubeService.fetchPlaylistVideos(
       uploadsPlaylistId,
-      10
+      MAX_VIDEOS
     );
 
     const transcriptions = await YoutubeService.getTranscriptions(
       videos.map((video) => video.videoId)
     );
 
-    videos.forEach((video, index) => {
-      video.transcription = transcriptions[index];
+    videos.forEach((video) => {
+      const transcription = transcriptions.find(
+        (transcription) => transcription.videoId === video.videoId
+      );
+
+      video.transcription = transcription?.transcription;
     });
 
     return videos;
