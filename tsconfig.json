@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -18,10 +22,77 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@models/*": ["./*"]
+      "@api/*": [
+        "api/*"
+      ],
+      "@api": [
+        "api"
+      ],
+      "@models/*": [
+        "models/*"
+      ],
+      "@models": [
+        "models"
+      ],
+      "@repositories/*": [
+        "repositories/*"
+      ],
+      "@repositories": [
+        "repositories"
+      ],
+      "@services/*": [
+        "services/*"
+      ],
+      "@services": [
+        "services"
+      ],
+      "@utilities/*": [
+        "utilities/*"
+      ],
+      "@utilities": [
+        "utilities"
+      ],
+      "@components/*": [
+        "components/*"
+      ],
+      "@components": [
+        "components"
+      ],
+      "@styles/*": [
+        "styles/*"
+      ],
+      "@styles": [
+        "styles"
+      ],
+      "@supabase/*": [
+        "supabase/*"
+      ],
+      "@supabase": [
+        "supabase"
+      ],
+      "@public/*": [
+        "public/*"
+      ],
+      "@public": [
+        "public"
+      ],
+      "@emails/*": [
+        "email/emails/*"
+      ],
+      "@emails": [
+        "email/emails"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
