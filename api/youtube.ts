@@ -37,7 +37,7 @@ export async function getChannelId(channelUrl: string): Promise<string> {
  * Main function to get the 10 latest videos from a channel URL like:
  *   https://www.youtube.com/@AlexHormozi/featured
  */
-export async function getLast10Videos(
+export async function getLastVideos(
   channelId: string
 ): Promise<YoutubeVideo[]> {
   try {
@@ -56,7 +56,7 @@ export async function getLast10Videos(
       );
     }
 
-    // 4. Fetch last 10 videos from the uploads playlist
+    // 4. Fetch last videos from the uploads playlist
     const videos = await YoutubeService.fetchPlaylistVideos(
       uploadsPlaylistId,
       MAX_VIDEOS

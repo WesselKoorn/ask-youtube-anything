@@ -3,7 +3,7 @@
 import { getChannelId } from "@api/youtube";
 
 import { uploadVideos } from "@api/pinecone";
-import { getLast10Videos } from "@api/youtube";
+import { getLastVideos } from "@api/youtube";
 import { redirect } from "next/navigation";
 
 export async function analyzeChannel(formData: FormData): Promise<void> {
@@ -16,7 +16,7 @@ export async function analyzeChannel(formData: FormData): Promise<void> {
 
     const channelId = await getChannelId(channelUrl);
 
-    const videos = await getLast10Videos(channelId);
+    const videos = await getLastVideos(channelId);
 
     await uploadVideos(videos);
 
