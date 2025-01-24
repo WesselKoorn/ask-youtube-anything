@@ -1,25 +1,26 @@
+@import "@styles/breakpoints.scss";
+
 .page {
-   display: flex;
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 80px;
-  padding-top: 120px;
   font-family: var(--font-geist-sans);
+  padding: 20px;
+  
+  @media (min-width: $desktop) {
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+    padding-top: 120px;
+  }
 }
 
 .main {
+  display: flex;
   width: 100%;
-}
+  height: calc(100vh - 134px);
 
-@media (max-width: 600px) {
-  .page {
-    padding: 32px;
-    padding-bottom: 80px;
-  }
-
-  .main {
-    align-items: center;
+  @media (min-width: $desktop) {
+    flex-direction: column;
+    height: calc(100svh - 200px);
   }
 }
