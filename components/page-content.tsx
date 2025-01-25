@@ -9,6 +9,14 @@ export default async function PageContent({ children }: PageContentProps) {
     <div className={styles.page}>
       <Header />
       <main className={styles.main}>{children}</main>
+      <footer className={styles.footer}>
+        <p>
+          Created by{" "}
+          <a href="https://off---piste.com" target="_blank">
+            OFF-PISTE
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

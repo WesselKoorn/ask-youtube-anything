@@ -11,16 +11,24 @@
     justify-content: center;
     padding: 80px;
     padding-top: 120px;
+    padding-bottom: 20px;
   }
 }
 
 .main {
   display: flex;
   width: 100%;
-  height: calc(100vh - 134px);
+  height: calc(100vh - 191px);
 
   @media (min-width: $desktop) {
     flex-direction: column;
     height: calc(100svh - 200px);
   }
+}
+
+.footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-alpha-500);
+  margin-top: 40px;
 }
