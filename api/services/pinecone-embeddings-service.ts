@@ -1,7 +1,7 @@
 import { PineconeSearchResult } from "@models/pinecone-search-result";
 import { YoutubeVideo } from "@models/youtube-video";
 import {
-  Pinecone,
+  Index,
   RecordMetadata,
   ScoredPineconeRecord,
 } from "@pinecone-database/pinecone";
@@ -26,17 +26,12 @@ export class PineconeEmbeddingService {
    * Splits each video's transcription into chunks, generates embeddings,
    * and upserts them to Pinecone (skipping duplicates if they exist).
    * @param videos Array of YoutubeVideo
-   * @param openAiApiKey Your OpenAI API key
-   * @param pineconeClient An initialized Pinecone
-   * @param pineconeIndexName The name of your Pinecone index
+   * @param pineconeIndex The Pinecone index to upsert to
    */
   static async chunkAndUpsertVideos(
     videos: YoutubeVideo[],
-    pineconeClient: Pinecone,
-    pineconeIndexName: string
+    pineconeIndex: Index<RecordMetadata>
   ): Promise<void> {
-    const index = pineconeClient.Index(pineconeIndexName);
-
     // 1) Chunk transcripts
     const allChunks: VideoChunk[] = [];
     for (const vid of videos) {
@@ -59,7 +54,7 @@ export class PineconeEmbeddingService {
     //    - For simplicity, we do a single fetch with up to 100 IDs at a time:
     const uniqueChunks = await PineconeEmbeddingService.filterDuplicateChunks(
       allChunks,
-      index
+      pineconeIndex
     );
 
     if (uniqueChunks.length === 0) {
@@ -95,7 +90,7 @@ export class PineconeEmbeddingService {
         })),
       };
 
-      await index.upsert(upsertRequest.vectors);
+      await pineconeIndex.upsert(upsertRequest.vectors);
 
       console.log(
         `Upserted ${upsertRequest.vectors.length} chunks (batch: ${batchIndex} - ${end})`
@@ -168,7 +163,7 @@ export class PineconeEmbeddingService {
    */
   private static async filterDuplicateChunks(
     chunks: VideoChunk[],
-    index: ReturnType<Pinecone["Index"]>
+    index: Index<RecordMetadata>
   ): Promise<VideoChunk[]> {
     const chunkIds = chunks.map((c) => c.id);
     const uniqueChunks: VideoChunk[] = [];
@@ -205,8 +200,7 @@ export class PineconeEmbeddingService {
   static async queryChannel(
     question: string,
     channelId: string,
-    pineconeClient: Pinecone,
-    pineconeIndexName: string,
+    pineconeIndex: Index<RecordMetadata>,
     topK = 5
   ): Promise<PineconeSearchResult[]> {
     // 1) Embed the question
@@ -215,7 +209,6 @@ export class PineconeEmbeddingService {
     ]);
 
     // 2) Query Pinecone with filter on channelId
-    const index = pineconeClient.Index(pineconeIndexName);
     const queryRequest = {
       vector: questionEmbedding,
       topK,
@@ -225,7 +218,7 @@ export class PineconeEmbeddingService {
       },
     };
 
-    const queryResponse = await index.query(queryRequest);
+    const queryResponse = await pineconeIndex.query(queryRequest);
 
     // 3) Transform response to a typed SearchResult array
     const matches: PineconeSearchResult[] =

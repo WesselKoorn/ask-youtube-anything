@@ -17,10 +17,11 @@ export async function uploadVideos(videos: YoutubeVideo[]): Promise<void> {
 
     const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
+    const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
+
     await PineconeEmbeddingService.chunkAndUpsertVideos(
       videos,
-      pinecone,
-      process.env.PINECONE_INDEX_NAME
+      index
     );
   } catch (error) {
     console.error(error);
@@ -43,11 +44,12 @@ export async function askQuestion(
 
   const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
+  const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
+
   const matches = await PineconeEmbeddingService.queryChannel(
     question,
     channelId,
-    pinecone,
-    process.env.PINECONE_INDEX_NAME
+    index
   );
 
   return matches;

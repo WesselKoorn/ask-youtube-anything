@@ -55,7 +55,7 @@ export class YoutubeService {
     const searchData = await searchResponse.json();
 
     if (!searchData.items || searchData.items.length === 0) {
-      throw new Error("No channel found");
+      throw new Error("Channel not found");
     }
 
     return searchData.items[0].id.channelId;
@@ -215,5 +215,9 @@ export class YoutubeService {
 
       return "";
     }
+  }
+
+  static sum(a: number, b: number): number {
+    return a + b;
   }
 }
