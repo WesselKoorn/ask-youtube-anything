@@ -2,6 +2,7 @@
 
 import { YoutubeService } from "@api/services/youtube-service";
 import { YoutubeVideo } from "@models/youtube-video";
+import { YoutubeCommentsService } from "@api/services/youtube-comments-service";
 
 const MAX_VIDEOS = 100;
 
@@ -62,7 +63,13 @@ export async function getLastVideos(
       MAX_VIDEOS
     );
 
+    // 5. Get transcriptions for all videos
     const transcriptions = await YoutubeService.getTranscriptions(
+      videos.map((video) => video.videoId)
+    );
+
+    // 6. Get comments for all videos
+    await YoutubeCommentsService.processVideosComments(
       videos.map((video) => video.videoId)
     );
 
