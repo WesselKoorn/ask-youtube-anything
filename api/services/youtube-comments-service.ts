@@ -1,15 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import { YoutubeComment } from '@models/youtube-comment';
-import { YoutubeCommentResponse } from '@models/youtube-comment-response';
+import { YoutubeComment } from "@models/youtube-comment";
+import { YoutubeCommentResponse } from "@models/youtube-comment-response";
+import { createClient } from "@lib/supabase/server";
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY || "";
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export class YoutubeCommentsService {
   /**
@@ -36,7 +30,7 @@ export class YoutubeCommentsService {
         throw new Error(`Failed to fetch comments: ${response.statusText}`);
       }
 
-      const data = await response.json() as YoutubeCommentResponse;
+      const data = (await response.json()) as YoutubeCommentResponse;
 
       const comments: YoutubeComment[] = data.items.map((item) => ({
         id: item.id,
@@ -61,6 +55,8 @@ export class YoutubeCommentsService {
    */
   static async storeComments(comments: YoutubeComment[]): Promise<void> {
     try {
+      const supabase = await createClient();
+
       const { error } = await supabase.from("comments").upsert(
         comments.map((comment) => ({
           id: comment.id,
@@ -95,10 +91,8 @@ export class YoutubeCommentsService {
         // Add a small delay to respect rate limits
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const { comments, nextPageToken: newPageToken } = await this.fetchVideoComments(
-          videoId,
-          nextPageToken
-        );
+        const { comments, nextPageToken: newPageToken } =
+          await this.fetchVideoComments(videoId, nextPageToken);
 
         await this.storeComments(comments);
 
@@ -121,10 +115,13 @@ export class YoutubeCommentsService {
       try {
         await this.processVideoComments(videoId);
       } catch (error) {
-        console.error(`Failed to process comments for video ${videoId}:`, error);
+        console.error(
+          `Failed to process comments for video ${videoId}:`,
+          error
+        );
         // Continue with next video even if one fails
         continue;
       }
     }
   }
-} 
+}

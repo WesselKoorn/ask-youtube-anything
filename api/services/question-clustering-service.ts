@@ -1,19 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
 import { YoutubeComment } from "@models/youtube-comment";
 import OpenAI from "openai";
 import { youtubeQuestionsIndex, createVectorRecord } from "@lib/pinecone";
 import { ScoredPineconeRecord } from "@pinecone-database/pinecone";
+import { createClient } from "@lib/supabase/server";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export class QuestionClusteringService {
   /**
@@ -39,6 +33,8 @@ export class QuestionClusteringService {
    */
   private static async createCluster(name: string): Promise<string> {
     try {
+      const supabase = await createClient();
+
       const { data, error } = await supabase
         .from("question_clusters")
         .insert({ name })
@@ -63,6 +59,8 @@ export class QuestionClusteringService {
     clusterId: string
   ): Promise<string> {
     try {
+      const supabase = await createClient();
+
       // Get embedding for the question
       const embedding = await this.getEmbedding(question);
       // Create a new question in Supabase
@@ -130,6 +128,8 @@ export class QuestionClusteringService {
     comments: YoutubeComment[]
   ): Promise<void> {
     try {
+      const supabase = await createClient();
+
       // Filter for comments that are questions with high confidence
       const questions = comments.filter(
         (comment) =>
@@ -170,6 +170,8 @@ export class QuestionClusteringService {
    */
   static async processUnclusteredQuestions(): Promise<void> {
     try {
+      const supabase = await createClient();
+
       const { data: comments, error } = await supabase
         .from("comments")
         .select("*")

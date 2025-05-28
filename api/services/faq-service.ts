@@ -1,13 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
 import { FAQQuestion } from "@models/faq-question";
 import { FAQFilter } from "@models/faq-filter";
 import { QuestionMetric } from "@models/question-metric";
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createClient } from "@lib/supabase/server";
 
 export class FAQService {
   /**
@@ -15,9 +9,9 @@ export class FAQService {
    */
   static async getChannelFAQs(filter?: FAQFilter): Promise<FAQQuestion[]> {
     try {
-      let query = supabase
-        .from("questions")
-        .select(`
+      const supabase = await createClient();
+
+      let query = supabase.from("questions").select(`
           id,
           canonical_question,
           cluster_id,
@@ -33,11 +27,17 @@ export class FAQService {
       }
 
       if (filter?.startDate) {
-        query = query.gte("question_metrics.last_updated", filter.startDate.toISOString());
+        query = query.gte(
+          "question_metrics.last_updated",
+          filter.startDate.toISOString()
+        );
       }
 
       if (filter?.endDate) {
-        query = query.lte("question_metrics.last_updated", filter.endDate.toISOString());
+        query = query.lte(
+          "question_metrics.last_updated",
+          filter.endDate.toISOString()
+        );
       }
 
       if (filter?.minFrequency) {
@@ -52,8 +52,17 @@ export class FAQService {
         id: question.id,
         canonicalQuestion: question.canonical_question,
         clusterId: question.cluster_id,
-        frequency: question.question_metrics.reduce((sum: number, metric: QuestionMetric) => sum + metric.frequency, 0),
-        lastUpdated: new Date(Math.max(...question.question_metrics.map((metric: QuestionMetric) => new Date(metric.last_updated).getTime()))),
+        frequency: question.question_metrics.reduce(
+          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
+          0
+        ),
+        lastUpdated: new Date(
+          Math.max(
+            ...question.question_metrics.map((metric: QuestionMetric) =>
+              new Date(metric.last_updated).getTime()
+            )
+          )
+        ),
       }));
 
       // Apply search filter if provided
@@ -74,11 +83,17 @@ export class FAQService {
   /**
    * Get FAQs for a specific video
    */
-  static async getVideoFAQs(videoId: string, filter?: Omit<FAQFilter, "videoId">): Promise<FAQQuestion[]> {
+  static async getVideoFAQs(
+    videoId: string,
+    filter?: Omit<FAQFilter, "videoId">
+  ): Promise<FAQQuestion[]> {
     try {
+      const supabase = await createClient();
+
       const { data, error } = await supabase
         .from("questions")
-        .select(`
+        .select(
+          `
           id,
           canonical_question,
           cluster_id,
@@ -86,7 +101,8 @@ export class FAQService {
             frequency,
             last_updated
           )
-        `)
+        `
+        )
         .eq("question_metrics.video_id", videoId);
 
       if (error) throw error;
@@ -104,15 +120,21 @@ export class FAQService {
       let filtered = faqQuestions;
 
       if (filter?.startDate) {
-        filtered = filtered.filter((question) => question.lastUpdated >= filter.startDate!);
+        filtered = filtered.filter(
+          (question) => question.lastUpdated >= filter.startDate!
+        );
       }
 
       if (filter?.endDate) {
-        filtered = filtered.filter((question) => question.lastUpdated <= filter.endDate!);
+        filtered = filtered.filter(
+          (question) => question.lastUpdated <= filter.endDate!
+        );
       }
 
       if (filter?.minFrequency) {
-        filtered = filtered.filter((question) => question.frequency >= filter.minFrequency!);
+        filtered = filtered.filter(
+          (question) => question.frequency >= filter.minFrequency!
+        );
       }
 
       if (filter?.searchQuery) {
@@ -137,10 +159,13 @@ export class FAQService {
     relatedQuestions: FAQQuestion[];
   }> {
     try {
+      const supabase = await createClient();
+
       // Get the main question
       const { data: questionData, error: questionError } = await supabase
         .from("questions")
-        .select(`
+        .select(
+          `
           id,
           canonical_question,
           cluster_id,
@@ -149,7 +174,8 @@ export class FAQService {
             frequency,
             last_updated
           )
-        `)
+        `
+        )
         .eq("id", questionId)
         .single();
 
@@ -159,14 +185,24 @@ export class FAQService {
         id: questionData.id,
         canonicalQuestion: questionData.canonical_question,
         clusterId: questionData.cluster_id,
-        frequency: questionData.question_metrics.reduce((sum: number, metric: QuestionMetric) => sum + metric.frequency, 0),
-        lastUpdated: new Date(Math.max(...questionData.question_metrics.map((metric: QuestionMetric) => new Date(metric.last_updated).getTime()))),
+        frequency: questionData.question_metrics.reduce(
+          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
+          0
+        ),
+        lastUpdated: new Date(
+          Math.max(
+            ...questionData.question_metrics.map((metric: QuestionMetric) =>
+              new Date(metric.last_updated).getTime()
+            )
+          )
+        ),
       };
 
       // Get related questions from the same cluster
       const { data: relatedData, error: relatedError } = await supabase
         .from("questions")
-        .select(`
+        .select(
+          `
           id,
           canonical_question,
           cluster_id,
@@ -175,7 +211,8 @@ export class FAQService {
             frequency,
             last_updated
           )
-        `)
+        `
+        )
         .eq("cluster_id", question.clusterId)
         .neq("id", questionId);
 
@@ -185,8 +222,17 @@ export class FAQService {
         id: question.id,
         canonicalQuestion: question.canonical_question,
         clusterId: question.cluster_id,
-        frequency: question.question_metrics.reduce((sum: number, metric: QuestionMetric) => sum + metric.frequency, 0),
-        lastUpdated: new Date(Math.max(...question.question_metrics.map((metric: QuestionMetric) => new Date(metric.last_updated).getTime()))),
+        frequency: question.question_metrics.reduce(
+          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
+          0
+        ),
+        lastUpdated: new Date(
+          Math.max(
+            ...question.question_metrics.map((metric: QuestionMetric) =>
+              new Date(metric.last_updated).getTime()
+            )
+          )
+        ),
       }));
 
       return { question, relatedQuestions };
@@ -195,4 +241,4 @@ export class FAQService {
       throw error;
     }
   }
-} 
+}

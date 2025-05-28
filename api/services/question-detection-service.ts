@@ -1,43 +1,42 @@
-import { createClient } from '@supabase/supabase-js';
-import { YoutubeComment } from '@models/youtube-comment';
-import OpenAI from 'openai';
+import { YoutubeComment } from "@models/youtube-comment";
+import OpenAI from "openai";
+import { createClient } from "@lib/supabase/server";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export class QuestionDetectionService {
   /**
    * Detect if a comment is a question using OpenAI
    */
-  static async detectQuestion(comment: string): Promise<{ isQuestion: boolean; confidence: number }> {
+  static async detectQuestion(
+    comment: string
+  ): Promise<{ isQuestion: boolean; confidence: number }> {
     try {
+      const supabase = await createClient();
+
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "You are a question detection system. Analyze the given text and determine if it's a question. Respond with a JSON object containing 'isQuestion' (boolean) and 'confidence' (number between 0 and 1)."
+            content:
+              "You are a question detection system. Analyze the given text and determine if it's a question. Respond with a JSON object containing 'isQuestion' (boolean) and 'confidence' (number between 0 and 1).",
           },
           {
             role: "user",
-            content: comment
-          }
+            content: comment,
+          },
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
       return {
         isQuestion: result.isQuestion || false,
-        confidence: result.confidence || 0
+        confidence: result.confidence || 0,
       };
     } catch (error) {
       console.error("Error detecting question:", error);
@@ -50,17 +49,21 @@ export class QuestionDetectionService {
    */
   static async processCommentsBatch(comments: YoutubeComment[]): Promise<void> {
     try {
+      const supabase = await createClient();
+
       // Process comments in parallel with a concurrency limit
       const batchSize = 5;
       for (let i = 0; i < comments.length; i += batchSize) {
         const batch = comments.slice(i, i + batchSize);
         const results = await Promise.all(
           batch.map(async (comment) => {
-            const { isQuestion, confidence } = await this.detectQuestion(comment.content);
+            const { isQuestion, confidence } = await this.detectQuestion(
+              comment.content
+            );
             return {
               ...comment,
               isQuestion,
-              questionConfidence: confidence
+              questionConfidence: confidence,
             };
           })
         );
@@ -74,7 +77,7 @@ export class QuestionDetectionService {
             content: comment.content,
             published_at: comment.publishedAt,
             is_question: comment.isQuestion,
-            question_confidence: comment.questionConfidence
+            question_confidence: comment.questionConfidence,
           })),
           { onConflict: "id" }
         );
@@ -85,7 +88,7 @@ export class QuestionDetectionService {
 
         // Add a small delay between batches to respect rate limits
         if (i + batchSize < comments.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
     } catch (error) {
@@ -99,6 +102,8 @@ export class QuestionDetectionService {
    */
   static async getUnprocessedComments(): Promise<YoutubeComment[]> {
     try {
+      const supabase = await createClient();
+
       const { data, error } = await supabase
         .from("comments")
         .select("*")
@@ -108,14 +113,14 @@ export class QuestionDetectionService {
         throw error;
       }
 
-      return data.map(comment => ({
+      return data.map((comment) => ({
         id: comment.id,
         videoId: comment.video_id,
         author: comment.author,
         content: comment.content,
         publishedAt: comment.published_at,
         isQuestion: comment.is_question,
-        questionConfidence: comment.question_confidence
+        questionConfidence: comment.question_confidence,
       }));
     } catch (error) {
       console.error("Error getting unprocessed comments:", error);
@@ -129,10 +134,11 @@ export class QuestionDetectionService {
   static async processUnprocessedComments(): Promise<void> {
     try {
       const comments = await this.getUnprocessedComments();
+
       await this.processCommentsBatch(comments);
     } catch (error) {
       console.error("Error processing unprocessed comments:", error);
       throw error;
     }
   }
-} 
+}
