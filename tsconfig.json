@@ -54,6 +54,12 @@
       "@utilities": [
         "utilities"
       ],
+      "@lib/*": [
+        "lib/*"
+      ],
+      "@lib": [
+        "lib"
+      ],
       "@components/*": [
         "components/*"
       ],
