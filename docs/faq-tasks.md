@@ -25,14 +25,25 @@ I've shared with you a faq-tasks.md file. This file is a description of all the 
 
 #### Supabase Tables
 ```sql
+-- Videos table
+videos (
+  id text primary key,  -- YouTube video ID
+  title text,
+  description text,
+  published_at timestamp,
+  channel_id text,
+  thumbnail_url text,
+  created_at timestamp default now()
+)
+
 -- Comments table
 comments (
   id uuid primary key,
-  video_id text,
+  video_id text references videos(id),
   author text,
   content text,
   published_at timestamp,
-  is_question boolean,
+  is_question boolean default false,
   question_confidence float,
   created_at timestamp
 )
@@ -57,7 +68,7 @@ question_clusters (
 question_metrics (
   id uuid primary key,
   question_id uuid references questions(id),
-  video_id text,
+  video_id text references videos(id),
   frequency int,
   last_updated timestamp
 )

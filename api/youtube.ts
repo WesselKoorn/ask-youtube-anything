@@ -45,21 +45,27 @@ export async function getLastVideos(
   channelId: string
 ): Promise<YoutubeVideo[]> {
   try {
+    console.log("Starting getLastVideos for channel:", channelId);
     if (!channelId) {
       throw new Error("Channel ID is required");
     }
 
     const supabase = await createAdminClient();
 
-    // Get the latest video date we've seen
+    // Get the latest video date we've seen.
+    console.log("Checking for latest video in database...");
     const { data: latestVideo } = await supabase
       .from("videos")
       .select("published_at")
+      .eq("channel_id", channelId)
       .order("published_at", { ascending: false })
       .limit(1)
       .single();
 
-    // 3. From the channelId, retrieve the "uploads" playlist ID
+    console.log("Latest video date:", latestVideo?.published_at);
+
+    // From the channelId, retrieve the "uploads" playlist ID.
+    console.log("Getting uploads playlist ID...");
     const uploadsPlaylistId = await YoutubeService.getUploadsPlaylistId(
       channelId
     );
@@ -69,44 +75,68 @@ export async function getLastVideos(
         `Could not find an uploads playlist for channel: ${channelId}`
       );
     }
+    console.log("Got uploads playlist ID:", uploadsPlaylistId);
 
-    // 4. Fetch last videos from the uploads playlist
+    // Fetch last videos from the uploads playlist.
+    console.log("Fetching videos from playlist...");
     const videos = await YoutubeService.fetchPlaylistVideos(
       uploadsPlaylistId,
       MAX_VIDEOS
     );
+    console.log(`Fetched ${videos.length} videos from playlist`);
 
-    // Filter videos by date if we have a latest video
+    // Filter videos by date if we have a latest video.
     const filteredVideos = latestVideo?.published_at
       ? videos.filter(
           (video) =>
             new Date(video.publishedAt) > new Date(latestVideo.published_at)
         )
       : videos;
+    console.log(`Filtered to ${filteredVideos.length} new videos`);
 
     if (filteredVideos.length === 0) {
-      return videos; // Return all videos if no new ones
+      console.log("No new videos found, returning all videos");
+      return videos; // Return all videos if no new ones.
     }
 
-    // 5. Get transcriptions for new videos
+    // Get transcriptions for new videos.
+    console.log("Getting transcriptions for new videos...");
     const transcriptions = await YoutubeService.getTranscriptions(
       filteredVideos.map((video) => video.videoId)
     );
+    console.log(`Got ${transcriptions.length} transcriptions`);
 
-    // 6. Get comments for new videos
-    await YoutubeCommentsService.processVideosComments(
-      filteredVideos.map((video) => video.videoId)
+    // Get all comments of the channel.
+    console.log("Getting channel comments...");
+    const comments = await YoutubeCommentsService.getChannelComments(
+      channelId,
+      latestVideo?.published_at
     );
+    console.log(`Got ${comments.length} comments`);
 
-    // 7. Process comments through question detection
+    // Store comments in Supabase.
+    console.log("Storing comments in Supabase...");
+    await YoutubeCommentsService.storeComments(comments);
+    console.log("Comments stored successfully");
+
+    // Process comments through question detection.
+    console.log("Getting unprocessed comments...");
     const unprocessedComments =
       await QuestionDetectionService.getUnprocessedComments();
+    console.log(`Found ${unprocessedComments.length} unprocessed comments`);
+
+    // Process comments through question detection.
+    console.log("Processing comments through question detection...");
     await QuestionDetectionService.processCommentsBatch(unprocessedComments);
+    console.log("Question detection complete");
 
-    // 8. Process questions through clustering
+    // Process questions through clustering.
+    console.log("Processing questions through clustering...");
     await QuestionClusteringService.processUnclusteredQuestions();
+    console.log("Question clustering complete");
 
-    // Store new videos in Supabase
+    // Store new videos in Supabase.
+    console.log("Storing new videos in Supabase...");
     const { error: videoError } = await supabase.from("videos").upsert(
       filteredVideos.map((video) => ({
         id: video.videoId,
@@ -120,10 +150,13 @@ export async function getLastVideos(
     );
 
     if (videoError) {
+      console.error("Error storing videos:", videoError);
       throw videoError;
     }
+    console.log("Videos stored successfully");
 
-    // Add transcriptions to videos
+    // Add transcriptions to videos.
+    console.log("Adding transcriptions to videos...");
     videos.forEach((video) => {
       const transcription = transcriptions.find(
         (transcription) => transcription.videoId === video.videoId
@@ -131,11 +164,11 @@ export async function getLastVideos(
 
       video.transcription = transcription?.transcription;
     });
+    console.log("Transcriptions added to videos");
 
     return videos;
   } catch (error) {
-    console.error(error);
-
+    console.error("Error in getLastVideos:", error);
     throw error;
   }
 }

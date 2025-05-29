@@ -1,5 +1,4 @@
 import { YoutubeVideo } from "@models/youtube-video";
-import { YoutubeComment } from "@models/youtube-comment";
 import { YoutubeTranscript } from "youtube-transcript";
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
@@ -18,20 +17,6 @@ interface PlaylistItem {
     thumbnails: {
       high: {
         url: string;
-      };
-    };
-  };
-}
-
-interface CommentThread {
-  id: string;
-  snippet: {
-    videoId: string;
-    topLevelComment: {
-      snippet: {
-        authorDisplayName: string;
-        textDisplay: string;
-        publishedAt: string;
       };
     };
   };
@@ -69,39 +54,42 @@ export class YoutubeService {
    * This approach uses "type=channel&q={handle}" to locate the channel.
    */
   static async getChannelId(channelName: string): Promise<string> {
-    // TODO: Search is an expensive call, see if we can omit it.
-    const searchResponse = await fetch(
-      `${YOUTUBE_DATA_API_URL}/search?` +
+    const channelResponse = await fetch(
+      `${YOUTUBE_DATA_API_URL}/channels?` +
         new URLSearchParams({
-          part: "snippet", // was "id"
-          q: channelName,
-          type: "channel",
-          maxResults: "1",
+          part: "snippet",
+          forHandle: channelName,
           key: YOUTUBE_DATA_API_KEY,
         }).toString()
     );
 
-    if (!searchResponse.ok) {
-      const errorData = await searchResponse.json().catch(() => null);
-
+    if (!channelResponse.ok) {
+      const errorData = await channelResponse.json().catch(() => null);
       console.error("YouTube API error:", {
-        status: searchResponse.status,
-        statusText: searchResponse.statusText,
+        status: channelResponse.status,
+        statusText: channelResponse.statusText,
         error: JSON.stringify(errorData) ?? "Unknown error",
       });
-
       throw new Error(
-        `Failed to fetch channel ID: ${searchResponse.status} ${searchResponse.statusText}`
+        `Failed to fetch channel ID: ${channelResponse.status} ${channelResponse.statusText}`
       );
     }
 
-    const searchData = await searchResponse.json();
+    const data = await channelResponse.json();
 
-    if (!searchData.items || searchData.items.length === 0) {
+    if (!data.items || data.items.length === 0) {
       throw new Error("Channel not found");
     }
 
-    return searchData.items[0].id.channelId;
+    const foundChannel = data.items[0];
+    console.log("Found channel:", {
+      id: foundChannel.id,
+      title: foundChannel.snippet.title,
+      customUrl: foundChannel.snippet.customUrl,
+      handle: channelName
+    });
+
+    return foundChannel.id;
   }
 
   /**
@@ -199,105 +187,6 @@ export class YoutubeService {
   }
 
   /**
-   * Get all comments for a channel with optional date filter
-   */
-  static async getChannelComments(
-    channelId: string,
-    afterDate?: string
-  ): Promise<YoutubeComment[]> {
-    const comments: YoutubeComment[] = [];
-    let nextPageToken: string | undefined;
-
-    do {
-      const params = new URLSearchParams({
-        part: "snippet",
-        allThreadsRelatedToChannelId: channelId,
-        maxResults: "100",
-        key: YOUTUBE_DATA_API_KEY,
-      });
-
-      if (nextPageToken) {
-        params.set("pageToken", nextPageToken);
-      }
-
-      const response = await fetch(
-        `${YOUTUBE_DATA_API_URL}/commentThreads?${params.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.items) {
-        const newComments = data.items
-          .map((item: CommentThread) => ({
-            id: item.id,
-            videoId: item.snippet.videoId,
-            author: item.snippet.topLevelComment.snippet.authorDisplayName,
-            content: item.snippet.topLevelComment.snippet.textDisplay,
-            publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-          }))
-          .filter((comment: YoutubeComment) => {
-            if (!afterDate) return true;
-            return new Date(comment.publishedAt) > new Date(afterDate);
-          });
-
-        comments.push(...newComments);
-
-        // If we've found comments older than afterDate, we can stop
-        if (
-          afterDate &&
-          newComments.length > 0 &&
-          new Date(newComments[newComments.length - 1].publishedAt) <=
-            new Date(afterDate)
-        ) {
-          break;
-        }
-      }
-
-      nextPageToken = data.nextPageToken;
-    } while (nextPageToken);
-
-    return comments;
-  }
-
-  /**
-   * Get comments for a specific video
-   * This is now just a filter on the channel comments
-   */
-  static async getComments(
-    videoId: string,
-    afterDate?: string
-  ): Promise<YoutubeComment[]> {
-    // Get the channel ID from the video
-    const videoResponse = await fetch(
-      `${YOUTUBE_DATA_API_URL}/videos?` +
-        new URLSearchParams({
-          part: "snippet",
-          id: videoId,
-          key: YOUTUBE_DATA_API_KEY,
-        }).toString()
-    );
-
-    if (!videoResponse.ok) {
-      throw new Error(`HTTP error! status: ${videoResponse.status}`);
-    }
-
-    const videoData = await videoResponse.json();
-    const channelId = videoData.items?.[0]?.snippet?.channelId;
-
-    if (!channelId) {
-      throw new Error("Could not find channel ID for video");
-    }
-
-    // Get all channel comments and filter for this video
-    const channelComments = await this.getChannelComments(channelId, afterDate);
-    return channelComments.filter((comment) => comment.videoId === videoId);
-  }
-
-  /**
    * Get transcriptions for multiple videos
    */
   static async getTranscriptions(videoIds: string[]): Promise<
@@ -366,9 +255,5 @@ export class YoutubeService {
 
       return "";
     }
-  }
-
-  static sum(a: number, b: number): number {
-    return a + b;
   }
 }

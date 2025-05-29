@@ -106,7 +106,7 @@ export class QuestionDetectionService {
       const { data: latestComment } = await supabase
         .from("comments")
         .select("published_at")
-        .is("is_question", null)
+        .is("question_confidence", null)
         .order("published_at", { ascending: false })
         .limit(1)
         .single();
@@ -115,7 +115,7 @@ export class QuestionDetectionService {
       const query = supabase
         .from("comments")
         .select("*")
-        .is("is_question", null);
+        .is("question_confidence", null);
 
       if (latestComment?.published_at) {
         query.gt("published_at", latestComment.published_at);

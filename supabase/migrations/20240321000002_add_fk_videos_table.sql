@@ -1,0 +1,13 @@
+-- -- Add foreign key constraints to comments table
+-- ALTER TABLE comments
+--   ADD CONSTRAINT fk_comments_video
+--   FOREIGN KEY (video_id)
+--   REFERENCES videos(id)
+--   ON DELETE CASCADE;
+
+-- -- Add foreign key constraints to question_metrics table
+-- ALTER TABLE question_metrics
+--   ADD CONSTRAINT fk_question_metrics_video
+--   FOREIGN KEY (video_id)
+--   REFERENCES videos(id)
+--   ON DELETE CASCADE;

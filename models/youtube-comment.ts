@@ -6,4 +6,5 @@ export interface YoutubeComment {
   publishedAt: string;
   isQuestion?: boolean;
   questionConfidence?: number;
+  clusterId?: string;
 }
