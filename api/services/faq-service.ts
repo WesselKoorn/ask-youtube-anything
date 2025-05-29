@@ -1,7 +1,7 @@
 import { FAQQuestion } from "@models/faq-question";
 import { FAQFilter } from "@models/faq-filter";
 import { QuestionMetric } from "@models/question-metric";
-import { createClient } from "@lib/supabase/server";
+import { createAdminClient } from "@lib/supabase/server";
 
 export class FAQService {
   /**
@@ -9,7 +9,7 @@ export class FAQService {
    */
   static async getChannelFAQs(filter?: FAQFilter): Promise<FAQQuestion[]> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       let query = supabase.from("questions").select(`
           id,
@@ -88,7 +88,7 @@ export class FAQService {
     filter?: Omit<FAQFilter, "videoId">
   ): Promise<FAQQuestion[]> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       const { data, error } = await supabase
         .from("questions")
@@ -159,7 +159,7 @@ export class FAQService {
     relatedQuestions: FAQQuestion[];
   }> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       // Get the main question
       const { data: questionData, error: questionError } = await supabase

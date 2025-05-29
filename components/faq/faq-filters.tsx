@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
+import styles from "./faq-filters.module.scss";
 
 export default function FAQFilters() {
   const router = useRouter();
@@ -10,19 +11,22 @@ export default function FAQFilters() {
   const createQueryString = useCallback(
     (name: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set(name, value);
+      if (value) {
+        params.set(name, value);
+      } else {
+        params.delete(name);
+      }
       return params.toString();
     },
     [searchParams]
   );
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     router.push(`/faq?${createQueryString("searchQuery", e.target.value)}`);
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    router.push(`/faq?${createQueryString(name, value)}`);
+    router.push(`/faq?${createQueryString(e.target.name, e.target.value)}`);
   };
 
   const handleFrequencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,63 +34,60 @@ export default function FAQFilters() {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow mb-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <label htmlFor="searchQuery" className="block text-sm font-medium text-gray-700 mb-1">
-            Search
+    <div className={styles.filters}>
+      <div className={styles.filterGrid}>
+        <div className={styles.filterGroup}>
+          <label htmlFor="searchQuery" className={styles.label}>
+            Search Questions
           </label>
           <input
             type="text"
             id="searchQuery"
-            name="searchQuery"
+            className={styles.input}
             placeholder="Search questions..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            defaultValue={searchParams.get("searchQuery") || ""}
-            onChange={handleSearch}
+            value={searchParams.get("searchQuery") || ""}
+            onChange={handleSearchChange}
           />
         </div>
 
-        <div>
-          <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className={styles.filterGroup}>
+          <label htmlFor="startDate" className={styles.label}>
             Start Date
           </label>
           <input
             type="date"
             id="startDate"
             name="startDate"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            defaultValue={searchParams.get("startDate") || ""}
+            className={styles.dateInput}
+            value={searchParams.get("startDate") || ""}
             onChange={handleDateChange}
           />
         </div>
 
-        <div>
-          <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className={styles.filterGroup}>
+          <label htmlFor="endDate" className={styles.label}>
             End Date
           </label>
           <input
             type="date"
             id="endDate"
             name="endDate"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            defaultValue={searchParams.get("endDate") || ""}
+            className={styles.dateInput}
+            value={searchParams.get("endDate") || ""}
             onChange={handleDateChange}
           />
         </div>
 
-        <div>
-          <label htmlFor="minFrequency" className="block text-sm font-medium text-gray-700 mb-1">
-            Min Frequency
+        <div className={styles.filterGroup}>
+          <label htmlFor="minFrequency" className={styles.label}>
+            Minimum Frequency
           </label>
           <input
             type="number"
             id="minFrequency"
-            name="minFrequency"
+            className={styles.numberInput}
             min="1"
-            placeholder="Minimum times asked"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            defaultValue={searchParams.get("minFrequency") || ""}
+            value={searchParams.get("minFrequency") || ""}
             onChange={handleFrequencyChange}
           />
         </div>

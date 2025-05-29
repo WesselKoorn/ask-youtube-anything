@@ -3,8 +3,11 @@
 import { YoutubeService } from "@api/services/youtube-service";
 import { YoutubeVideo } from "@models/youtube-video";
 import { YoutubeCommentsService } from "@api/services/youtube-comments-service";
+import { QuestionDetectionService } from "@api/services/question-detection-service";
+import { QuestionClusteringService } from "@api/services/question-clustering-service";
+import { createAdminClient } from "@lib/supabase/server";
 
-const MAX_VIDEOS = 100;
+const MAX_VIDEOS = 50;
 
 export async function getChannelId(channelUrl: string): Promise<string> {
   try {
@@ -46,6 +49,16 @@ export async function getLastVideos(
       throw new Error("Channel ID is required");
     }
 
+    const supabase = await createAdminClient();
+
+    // Get the latest video date we've seen
+    const { data: latestVideo } = await supabase
+      .from("videos")
+      .select("published_at")
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .single();
+
     // 3. From the channelId, retrieve the "uploads" playlist ID
     const uploadsPlaylistId = await YoutubeService.getUploadsPlaylistId(
       channelId
@@ -63,16 +76,54 @@ export async function getLastVideos(
       MAX_VIDEOS
     );
 
-    // 5. Get transcriptions for all videos
+    // Filter videos by date if we have a latest video
+    const filteredVideos = latestVideo?.published_at
+      ? videos.filter(
+          (video) =>
+            new Date(video.publishedAt) > new Date(latestVideo.published_at)
+        )
+      : videos;
+
+    if (filteredVideos.length === 0) {
+      return videos; // Return all videos if no new ones
+    }
+
+    // 5. Get transcriptions for new videos
     const transcriptions = await YoutubeService.getTranscriptions(
-      videos.map((video) => video.videoId)
+      filteredVideos.map((video) => video.videoId)
     );
 
-    // 6. Get comments for all videos
+    // 6. Get comments for new videos
     await YoutubeCommentsService.processVideosComments(
-      videos.map((video) => video.videoId)
+      filteredVideos.map((video) => video.videoId)
     );
 
+    // 7. Process comments through question detection
+    const unprocessedComments =
+      await QuestionDetectionService.getUnprocessedComments();
+    await QuestionDetectionService.processCommentsBatch(unprocessedComments);
+
+    // 8. Process questions through clustering
+    await QuestionClusteringService.processUnclusteredQuestions();
+
+    // Store new videos in Supabase
+    const { error: videoError } = await supabase.from("videos").upsert(
+      filteredVideos.map((video) => ({
+        id: video.videoId,
+        title: video.title,
+        description: video.description,
+        published_at: video.publishedAt,
+        channel_id: video.channelId,
+        thumbnail_url: video.thumbnailUrl,
+      })),
+      { onConflict: "id" }
+    );
+
+    if (videoError) {
+      throw videoError;
+    }
+
+    // Add transcriptions to videos
     videos.forEach((video) => {
       const transcription = transcriptions.find(
         (transcription) => transcription.videoId === video.videoId

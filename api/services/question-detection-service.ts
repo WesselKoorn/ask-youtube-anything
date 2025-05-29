@@ -1,6 +1,6 @@
 import { YoutubeComment } from "@models/youtube-comment";
 import OpenAI from "openai";
-import { createClient } from "@lib/supabase/server";
+import { createAdminClient } from "@lib/supabase/server";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -15,8 +15,6 @@ export class QuestionDetectionService {
     comment: string
   ): Promise<{ isQuestion: boolean; confidence: number }> {
     try {
-      const supabase = await createClient();
-
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
@@ -49,7 +47,7 @@ export class QuestionDetectionService {
    */
   static async processCommentsBatch(comments: YoutubeComment[]): Promise<void> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       // Process comments in parallel with a concurrency limit
       const batchSize = 5;
@@ -98,16 +96,32 @@ export class QuestionDetectionService {
   }
 
   /**
-   * Get all unprocessed comments from Supabase
+   * Get unprocessed comments from Supabase that are new
    */
   static async getUnprocessedComments(): Promise<YoutubeComment[]> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
-      const { data, error } = await supabase
+      // Get the latest processed comment's published_at date
+      const { data: latestComment } = await supabase
+        .from("comments")
+        .select("published_at")
+        .is("is_question", null)
+        .order("published_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      // If we have a latest comment, only get comments newer than that
+      const query = supabase
         .from("comments")
         .select("*")
         .is("is_question", null);
+
+      if (latestComment?.published_at) {
+        query.gt("published_at", latestComment.published_at);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;

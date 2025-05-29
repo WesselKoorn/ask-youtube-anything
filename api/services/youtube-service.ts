@@ -1,8 +1,41 @@
 import { YoutubeVideo } from "@models/youtube-video";
+import { YoutubeComment } from "@models/youtube-comment";
 import { YoutubeTranscript } from "youtube-transcript";
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY || "";
+
+interface PlaylistItem {
+  snippet: {
+    resourceId: {
+      videoId: string;
+    };
+    title: string;
+    description: string;
+    publishedAt: string;
+    channelId: string;
+    channelTitle: string;
+    thumbnails: {
+      high: {
+        url: string;
+      };
+    };
+  };
+}
+
+interface CommentThread {
+  id: string;
+  snippet: {
+    videoId: string;
+    topLevelComment: {
+      snippet: {
+        authorDisplayName: string;
+        textDisplay: string;
+        publishedAt: string;
+      };
+    };
+  };
+}
 
 export class YoutubeService {
   /**
@@ -49,7 +82,17 @@ export class YoutubeService {
     );
 
     if (!searchResponse.ok) {
-      throw new Error("Failed to fetch channel ID");
+      const errorData = await searchResponse.json().catch(() => null);
+
+      console.error("YouTube API error:", {
+        status: searchResponse.status,
+        statusText: searchResponse.statusText,
+        error: JSON.stringify(errorData) ?? "Unknown error",
+      });
+
+      throw new Error(
+        `Failed to fetch channel ID: ${searchResponse.status} ${searchResponse.statusText}`
+      );
     }
 
     const searchData = await searchResponse.json();
@@ -79,7 +122,7 @@ export class YoutubeService {
         `YouTube channels API error: ${channelResponse.status} ${channelResponse.statusText}`
       );
 
-      throw new Error("Failed to fetch channel ID");
+      throw new Error(`Failed to fetch channel ${channelId}`);
     }
 
     const data = await channelResponse.json();
@@ -93,65 +136,170 @@ export class YoutubeService {
   }
 
   /**
-   * Fetch up to 'maxResults' videos from an 'uploads' playlist via the PlaylistItems API.
+   * Fetch videos from a playlist with pagination
    */
   static async fetchPlaylistVideos(
     playlistId: string,
     maxResults: number
   ): Promise<YoutubeVideo[]> {
-    const playlistResponse = await fetch(
-      `${YOUTUBE_DATA_API_URL}/playlistItems?` +
-        new URLSearchParams({
+    try {
+      const videos: YoutubeVideo[] = [];
+      let nextPageToken: string | undefined;
+
+      do {
+        const params = new URLSearchParams({
           part: "snippet",
           playlistId: playlistId,
           maxResults: maxResults.toString(),
           key: YOUTUBE_DATA_API_KEY,
+        });
+
+        if (nextPageToken) {
+          params.set("pageToken", nextPageToken);
+        }
+
+        const playlistResponse = await fetch(
+          `${YOUTUBE_DATA_API_URL}/playlistItems?` + params.toString()
+        );
+
+        if (!playlistResponse.ok) {
+          console.error(
+            `YouTube playlistItems API error: ${playlistResponse.status} ${playlistResponse.statusText}`
+          );
+
+          throw new Error("Failed to fetch playlist videos");
+        }
+
+        const data = await playlistResponse.json();
+
+        if (data.items) {
+          videos.push(
+            ...data.items.map((item: PlaylistItem) => ({
+              videoId: item.snippet.resourceId.videoId,
+              title: item.snippet.title,
+              description: item.snippet.description,
+              publishedAt: item.snippet.publishedAt,
+              channelId: item.snippet.channelId,
+              thumbnailUrl: item.snippet.thumbnails.high.url,
+            }))
+          );
+        }
+
+        nextPageToken = data.nextPageToken;
+
+        // Add a small delay to respect rate limits
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } while (nextPageToken && videos.length < maxResults);
+
+      return videos.slice(0, maxResults);
+    } catch (error) {
+      console.error("Error fetching playlist videos:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all comments for a channel with optional date filter
+   */
+  static async getChannelComments(
+    channelId: string,
+    afterDate?: string
+  ): Promise<YoutubeComment[]> {
+    const comments: YoutubeComment[] = [];
+    let nextPageToken: string | undefined;
+
+    do {
+      const params = new URLSearchParams({
+        part: "snippet",
+        allThreadsRelatedToChannelId: channelId,
+        maxResults: "100",
+        key: YOUTUBE_DATA_API_KEY,
+      });
+
+      if (nextPageToken) {
+        params.set("pageToken", nextPageToken);
+      }
+
+      const response = await fetch(
+        `${YOUTUBE_DATA_API_URL}/commentThreads?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.items) {
+        const newComments = data.items
+          .map((item: CommentThread) => ({
+            id: item.id,
+            videoId: item.snippet.videoId,
+            author: item.snippet.topLevelComment.snippet.authorDisplayName,
+            content: item.snippet.topLevelComment.snippet.textDisplay,
+            publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
+          }))
+          .filter((comment: YoutubeComment) => {
+            if (!afterDate) return true;
+            return new Date(comment.publishedAt) > new Date(afterDate);
+          });
+
+        comments.push(...newComments);
+
+        // If we've found comments older than afterDate, we can stop
+        if (
+          afterDate &&
+          newComments.length > 0 &&
+          new Date(newComments[newComments.length - 1].publishedAt) <=
+            new Date(afterDate)
+        ) {
+          break;
+        }
+      }
+
+      nextPageToken = data.nextPageToken;
+    } while (nextPageToken);
+
+    return comments;
+  }
+
+  /**
+   * Get comments for a specific video
+   * This is now just a filter on the channel comments
+   */
+  static async getComments(
+    videoId: string,
+    afterDate?: string
+  ): Promise<YoutubeComment[]> {
+    // Get the channel ID from the video
+    const videoResponse = await fetch(
+      `${YOUTUBE_DATA_API_URL}/videos?` +
+        new URLSearchParams({
+          part: "snippet",
+          id: videoId,
+          key: YOUTUBE_DATA_API_KEY,
         }).toString()
     );
 
-    if (!playlistResponse.ok) {
-      console.error(
-        `YouTube playlistItems API error: ${playlistResponse.status} ${playlistResponse.statusText}`
-      );
-
-      throw new Error("Failed to fetch playlist videos");
+    if (!videoResponse.ok) {
+      throw new Error(`HTTP error! status: ${videoResponse.status}`);
     }
 
-    const data = await playlistResponse.json();
+    const videoData = await videoResponse.json();
+    const channelId = videoData.items?.[0]?.snippet?.channelId;
 
-    const videos: YoutubeVideo[] =
-      data.items?.map(
-        (item: {
-          id: string;
-          snippet: {
-            title: string;
-            description: string;
-            thumbnails: {
-              high: { url: string };
-            };
-            publishedAt: string;
-            channelId: string;
-            resourceId: {
-              videoId: string;
-            };
-          };
-        }) => {
-          const video: YoutubeVideo = {
-            title: item.snippet.title,
-            description: item.snippet.description,
-            thumbnailUrl: item.snippet.thumbnails.high.url,
-            publishedAt: item.snippet.publishedAt,
-            videoId: item.snippet.resourceId.videoId,
-            channelId: item.snippet.channelId,
-          };
+    if (!channelId) {
+      throw new Error("Could not find channel ID for video");
+    }
 
-          return video;
-        }
-      ) ?? [];
-
-    return videos;
+    // Get all channel comments and filter for this video
+    const channelComments = await this.getChannelComments(channelId, afterDate);
+    return channelComments.filter((comment) => comment.videoId === videoId);
   }
 
+  /**
+   * Get transcriptions for multiple videos
+   */
   static async getTranscriptions(videoIds: string[]): Promise<
     {
       videoId: string;
@@ -174,6 +322,9 @@ export class YoutubeService {
     return results;
   }
 
+  /**
+   * Get transcript for a single video using youtube-transcript
+   */
   static async getTranscript(videoId: string): Promise<string> {
     const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
 

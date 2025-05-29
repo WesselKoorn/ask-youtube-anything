@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FAQQuestion } from "@models/faq-question";
+import styles from "./faq-detail.module.scss";
 
 interface FAQDetailProps {
   question: FAQQuestion;
@@ -8,20 +9,15 @@ interface FAQDetailProps {
 
 export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps) {
   return (
-    <div className="space-y-8">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex justify-between items-start mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {question.canonicalQuestion}
-          </h1>
-          <Link
-            href="/faq"
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
+    <div className={styles.detail}>
+      <div className={styles.mainQuestion}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>{question.canonicalQuestion}</h1>
+          <Link href="/faq" className={styles.backLink}>
             ← Back to FAQs
           </Link>
         </div>
-        <div className="flex items-center space-x-4 text-sm text-gray-500">
+        <div className={styles.metadata}>
           <span>Asked {question.frequency} times</span>
           <span>
             Last updated {new Date(question.lastUpdated).toLocaleDateString()}
@@ -30,20 +26,20 @@ export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps
       </div>
 
       {relatedQuestions.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Related Questions</h2>
-          <div className="space-y-4">
+        <div className={styles.relatedSection}>
+          <h2 className={styles.relatedTitle}>Related Questions</h2>
+          <div className={styles.relatedList}>
             {relatedQuestions.map((relatedQuestion) => (
               <Link
                 key={relatedQuestion.id}
                 href={`/faq/${relatedQuestion.id}`}
-                className="block p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow"
+                className={styles.relatedItem}
               >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-medium text-gray-900">
+                <div className={styles.relatedHeader}>
+                  <h3 className={styles.relatedQuestion}>
                     {relatedQuestion.canonicalQuestion}
                   </h3>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className={styles.metadata}>
                     <span>Asked {relatedQuestion.frequency} times</span>
                     <span>
                       Last updated{" "}

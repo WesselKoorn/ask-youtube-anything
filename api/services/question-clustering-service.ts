@@ -1,13 +1,21 @@
 import { YoutubeComment } from "@models/youtube-comment";
 import OpenAI from "openai";
-import { youtubeQuestionsIndex, createVectorRecord } from "@lib/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
 import { ScoredPineconeRecord } from "@pinecone-database/pinecone";
-import { createClient } from "@lib/supabase/server";
+import { createAdminClient } from "@lib/supabase/server";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Pinecone client
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY!,
+});
+
+// Get the index for YouTube questions
+const youtubeQuestionsIndex = pinecone.Index("youtube-questions");
 
 export class QuestionClusteringService {
   /**
@@ -28,22 +36,24 @@ export class QuestionClusteringService {
   }
 
   /**
-   * Create a new question cluster
+   * Create a new cluster for a question
    * @private
    */
-  private static async createCluster(name: string): Promise<string> {
+  private static async createCluster(question: string): Promise<string> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
-      const { data, error } = await supabase
+      const { data: cluster, error } = await supabase
         .from("question_clusters")
-        .insert({ name })
+        .insert({ name: question })
         .select()
         .single();
+
       if (error) {
         throw error;
       }
-      return data.id;
+
+      return cluster.id;
     } catch (error) {
       console.error("Error creating cluster:", error);
       throw error;
@@ -59,10 +69,11 @@ export class QuestionClusteringService {
     clusterId: string
   ): Promise<string> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       // Get embedding for the question
       const embedding = await this.getEmbedding(question);
+      
       // Create a new question in Supabase
       const { data: questionData, error: questionError } = await supabase
         .from("questions")
@@ -73,18 +84,25 @@ export class QuestionClusteringService {
         })
         .select()
         .single();
+
       if (questionError) {
         throw questionError;
       }
+
       // Store the embedding in Pinecone
       await youtubeQuestionsIndex.upsert([
-        createVectorRecord(
-          questionData.pinecone_id,
-          question,
-          clusterId,
-          embedding
-        ),
+        {
+          id: questionData.pinecone_id,
+          values: embedding,
+          metadata: {
+            question_id: questionData.id,
+            canonical_question: question,
+            cluster_id: clusterId,
+            created_at: new Date().toISOString(),
+          },
+        },
       ]);
+
       return questionData.id;
     } catch (error) {
       console.error("Error storing canonical question:", error);
@@ -128,7 +146,7 @@ export class QuestionClusteringService {
     comments: YoutubeComment[]
   ): Promise<void> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       // Filter for comments that are questions with high confidence
       const questions = comments.filter(
@@ -170,7 +188,7 @@ export class QuestionClusteringService {
    */
   static async processUnclusteredQuestions(): Promise<void> {
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
 
       const { data: comments, error } = await supabase
         .from("comments")
