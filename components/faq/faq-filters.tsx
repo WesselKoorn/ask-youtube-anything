@@ -4,7 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import styles from "./faq-filters.module.scss";
 
-export default function FAQFilters() {
+interface FAQFiltersProps {
+  channelId: string;
+}
+
+export default function FAQFilters({ channelId }: FAQFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -22,15 +26,15 @@ export default function FAQFilters() {
   );
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    router.push(`/faq?${createQueryString("searchQuery", e.target.value)}`);
+    router.push(`/${channelId}/faq?${createQueryString("searchQuery", e.target.value)}`);
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    router.push(`/faq?${createQueryString(e.target.name, e.target.value)}`);
+    router.push(`/${channelId}/faq?${createQueryString(e.target.name, e.target.value)}`);
   };
 
   const handleFrequencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    router.push(`/faq?${createQueryString("minFrequency", e.target.value)}`);
+    router.push(`/${channelId}/faq?${createQueryString("minFrequency", e.target.value)}`);
   };
 
   return (

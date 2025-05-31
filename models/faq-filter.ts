@@ -1,4 +1,5 @@
 export interface FAQFilter {
+  channelId: string;
   videoId?: string;
   startDate?: Date;
   endDate?: Date;

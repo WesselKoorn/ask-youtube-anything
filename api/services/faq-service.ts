@@ -8,6 +8,7 @@ type FAQFilter = {
   endDate?: Date;
   minFrequency?: number;
   searchQuery?: string;
+  channelId: string;
 };
 
 type QuestionWithMetrics = Database['public']['Tables']['questions']['Row'] & {
@@ -18,7 +19,7 @@ export class FAQService {
   /**
    * Get FAQs for a specific channel
    */
-  static async getChannelFAQs(filter?: FAQFilter): Promise<FAQQuestion[]> {
+  static async getChannelFAQs(filter: FAQFilter): Promise<FAQQuestion[]> {
     try {
       const supabase = await createAdminClient();
 
@@ -34,7 +35,8 @@ export class FAQService {
             frequency,
             last_updated
           )
-        `);
+        `)
+        .eq("channel_id", filter.channelId);
 
       if (filter?.videoId) {
         query = query.eq("question_metrics.video_id", filter.videoId);
