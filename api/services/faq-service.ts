@@ -1,7 +1,18 @@
-import { FAQQuestion } from "@models/faq-question";
-import { FAQFilter } from "@models/faq-filter";
-import { QuestionMetric } from "@models/question-metric";
+import { Database } from '@supabase/database.types';
 import { createAdminClient } from "@lib/supabase/server";
+import { FAQQuestion } from "@models/faq-question";
+
+type FAQFilter = {
+  videoId?: string;
+  startDate?: Date;
+  endDate?: Date;
+  minFrequency?: number;
+  searchQuery?: string;
+};
+
+type QuestionWithMetrics = Database['public']['Tables']['questions']['Row'] & {
+  question_metrics: Database['public']['Tables']['question_metrics']['Row'][];
+};
 
 export class FAQService {
   /**
@@ -15,6 +26,9 @@ export class FAQService {
           id,
           canonical_question,
           cluster_id,
+          channel_id,
+          created_at,
+          pinecone_id,
           question_metrics (
             video_id,
             frequency,
@@ -48,28 +62,31 @@ export class FAQService {
       if (error) throw error;
 
       // Transform and aggregate the data
-      const faqQuestions = data.map((question) => ({
-        id: question.id,
-        canonicalQuestion: question.canonical_question,
-        clusterId: question.cluster_id,
-        frequency: question.question_metrics.reduce(
-          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
+      const faqQuestions = (data as QuestionWithMetrics[]).map((question) => {
+        const totalFrequency = question.question_metrics.reduce(
+          (sum, metric) => sum + (metric.frequency || 0),
           0
-        ),
-        lastUpdated: new Date(
-          Math.max(
-            ...question.question_metrics.map((metric: QuestionMetric) =>
-              new Date(metric.last_updated).getTime()
-            )
-          )
-        ),
-      }));
+        );
+        const lastUpdated = question.question_metrics.reduce(
+          (latest, metric) => {
+            const metricDate = new Date(metric.last_updated || '');
+            return metricDate > latest ? metricDate : latest;
+          },
+          new Date(0)
+        );
+
+        return {
+          ...question,
+          frequency: totalFrequency,
+          lastUpdated: lastUpdated.toISOString()
+        };
+      });
 
       // Apply search filter if provided
       if (filter?.searchQuery) {
         const searchLower = filter.searchQuery.toLowerCase();
         return faqQuestions.filter((question) =>
-          question.canonicalQuestion.toLowerCase().includes(searchLower)
+          question.canonical_question.toLowerCase().includes(searchLower)
         );
       }
 
@@ -97,6 +114,9 @@ export class FAQService {
           id,
           canonical_question,
           cluster_id,
+          channel_id,
+          created_at,
+          pinecone_id,
           question_metrics!inner (
             frequency,
             last_updated
@@ -107,40 +127,33 @@ export class FAQService {
 
       if (error) throw error;
 
-      const faqQuestions = data.map((question) => ({
-        id: question.id,
-        canonicalQuestion: question.canonical_question,
-        clusterId: question.cluster_id,
-        videoId,
-        frequency: question.question_metrics[0].frequency,
-        lastUpdated: new Date(question.question_metrics[0].last_updated),
-      }));
+      const faqQuestions = (data as QuestionWithMetrics[]).map((question) => {
+        const totalFrequency = question.question_metrics.reduce(
+          (sum, metric) => sum + (metric.frequency || 0),
+          0
+        );
+        const lastUpdated = question.question_metrics.reduce(
+          (latest, metric) => {
+            const metricDate = new Date(metric.last_updated || '');
+            return metricDate > latest ? metricDate : latest;
+          },
+          new Date(0)
+        );
+
+        return {
+          ...question,
+          frequency: totalFrequency,
+          lastUpdated: lastUpdated.toISOString()
+        };
+      });
 
       // Apply additional filters
       let filtered = faqQuestions;
 
-      if (filter?.startDate) {
-        filtered = filtered.filter(
-          (question) => question.lastUpdated >= filter.startDate!
-        );
-      }
-
-      if (filter?.endDate) {
-        filtered = filtered.filter(
-          (question) => question.lastUpdated <= filter.endDate!
-        );
-      }
-
-      if (filter?.minFrequency) {
-        filtered = filtered.filter(
-          (question) => question.frequency >= filter.minFrequency!
-        );
-      }
-
       if (filter?.searchQuery) {
         const searchLower = filter.searchQuery.toLowerCase();
         filtered = filtered.filter((question) =>
-          question.canonicalQuestion.toLowerCase().includes(searchLower)
+          question.canonical_question.toLowerCase().includes(searchLower)
         );
       }
 
@@ -169,6 +182,9 @@ export class FAQService {
           id,
           canonical_question,
           cluster_id,
+          channel_id,
+          created_at,
+          pinecone_id,
           question_metrics (
             video_id,
             frequency,
@@ -181,21 +197,22 @@ export class FAQService {
 
       if (questionError) throw questionError;
 
+      const totalFrequency = questionData.question_metrics.reduce(
+        (sum, metric) => sum + (metric.frequency || 0),
+        0
+      );
+      const lastUpdated = questionData.question_metrics.reduce(
+        (latest, metric) => {
+          const metricDate = new Date(metric.last_updated || '');
+          return metricDate > latest ? metricDate : latest;
+        },
+        new Date(0)
+      );
+
       const question: FAQQuestion = {
-        id: questionData.id,
-        canonicalQuestion: questionData.canonical_question,
-        clusterId: questionData.cluster_id,
-        frequency: questionData.question_metrics.reduce(
-          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
-          0
-        ),
-        lastUpdated: new Date(
-          Math.max(
-            ...questionData.question_metrics.map((metric: QuestionMetric) =>
-              new Date(metric.last_updated).getTime()
-            )
-          )
-        ),
+        ...questionData,
+        frequency: totalFrequency,
+        lastUpdated: lastUpdated.toISOString()
       };
 
       // Get related questions from the same cluster
@@ -206,6 +223,9 @@ export class FAQService {
           id,
           canonical_question,
           cluster_id,
+          channel_id,
+          created_at,
+          pinecone_id,
           question_metrics (
             video_id,
             frequency,
@@ -213,31 +233,73 @@ export class FAQService {
           )
         `
         )
-        .eq("cluster_id", question.clusterId)
+        .eq("cluster_id", question.cluster_id ?? '')
         .neq("id", questionId);
 
       if (relatedError) throw relatedError;
 
-      const relatedQuestions: FAQQuestion[] = relatedData.map((question) => ({
-        id: question.id,
-        canonicalQuestion: question.canonical_question,
-        clusterId: question.cluster_id,
-        frequency: question.question_metrics.reduce(
-          (sum: number, metric: QuestionMetric) => sum + metric.frequency,
+      const relatedQuestions: FAQQuestion[] = (relatedData as QuestionWithMetrics[]).map((question) => {
+        const totalFrequency = question.question_metrics.reduce(
+          (sum, metric) => sum + (metric.frequency || 0),
           0
-        ),
-        lastUpdated: new Date(
-          Math.max(
-            ...question.question_metrics.map((metric: QuestionMetric) =>
-              new Date(metric.last_updated).getTime()
-            )
-          )
-        ),
-      }));
+        );
+        const lastUpdated = question.question_metrics.reduce(
+          (latest, metric) => {
+            const metricDate = new Date(metric.last_updated || '');
+            return metricDate > latest ? metricDate : latest;
+          },
+          new Date(0)
+        );
+
+        return {
+          ...question,
+          frequency: totalFrequency,
+          lastUpdated: lastUpdated.toISOString()
+        };
+      });
 
       return { question, relatedQuestions };
     } catch (error) {
       console.error("Error getting question details:", error);
+      throw error;
+    }
+  }
+
+  static async getTopQuestions(channelId: string): Promise<Database['public']['Tables']['question_clusters']['Row'][]> {
+    const supabase = await createAdminClient();
+    const { data: clusters, error } = await supabase
+      .from("question_clusters")
+      .select("*")
+      .eq("channel_id", channelId)
+      .order("name", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("Error fetching top questions:", error);
+      throw error;
+    }
+
+    return clusters;
+  }
+
+  static async recordQuestionMetric(
+    questionId: string,
+    videoId: string,
+    channelId: string
+  ): Promise<void> {
+    const supabase = await createAdminClient();
+    const questionMetric: Database['public']['Tables']['question_metrics']['Insert'] = {
+      question_id: questionId,
+      video_id: videoId,
+      channel_id: channelId,
+      frequency: 1,
+      last_updated: new Date().toISOString()
+    };
+
+    const { error } = await supabase.from("question_metrics").insert(questionMetric);
+
+    if (error) {
+      console.error("Error recording question metric:", error);
       throw error;
     }
   }

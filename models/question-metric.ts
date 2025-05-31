@@ -1,5 +1,3 @@
-export interface QuestionMetric {
-  video_id: string;
-  frequency: number;
-  last_updated: string;
-} 
+import { Database } from "@supabase/database.types";
+
+export type QuestionMetric = Database['public']['Tables']['question_metrics']['Row']; 

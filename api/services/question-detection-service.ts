@@ -1,11 +1,14 @@
-import { YoutubeComment } from "@models/youtube-comment";
 import OpenAI from "openai";
 import { createAdminClient } from "@lib/supabase/server";
+import { Database } from '@supabase/database.types';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+type Comment = Database['public']['Tables']['comments']['Row'];
+type CommentUpdate = Database['public']['Tables']['comments']['Update'];
 
 export class QuestionDetectionService {
   /**
@@ -45,7 +48,7 @@ export class QuestionDetectionService {
   /**
    * Process a batch of comments for question detection
    */
-  static async processCommentsBatch(comments: YoutubeComment[]): Promise<void> {
+  static async processCommentsBatch(comments: Comment[]): Promise<void> {
     try {
       const supabase = await createAdminClient();
 
@@ -60,8 +63,8 @@ export class QuestionDetectionService {
             );
             return {
               ...comment,
-              isQuestion,
-              questionConfidence: confidence,
+              is_question: isQuestion,
+              question_confidence: confidence,
             };
           })
         );
@@ -70,12 +73,13 @@ export class QuestionDetectionService {
         const { error } = await supabase.from("comments").upsert(
           results.map((comment) => ({
             id: comment.id,
-            video_id: comment.videoId,
+            video_id: comment.video_id,
+            channel_id: comment.channel_id,
             author: comment.author,
             content: comment.content,
-            published_at: comment.publishedAt,
-            is_question: comment.isQuestion,
-            question_confidence: comment.questionConfidence,
+            published_at: comment.published_at,
+            is_question: comment.is_question,
+            question_confidence: comment.question_confidence,
           })),
           { onConflict: "id" }
         );
@@ -98,61 +102,92 @@ export class QuestionDetectionService {
   /**
    * Get unprocessed comments from Supabase that are new
    */
-  static async getUnprocessedComments(): Promise<YoutubeComment[]> {
-    try {
-      const supabase = await createAdminClient();
+  static async getUnprocessedComments(channelId: string): Promise<Comment[]> {
+    const supabase = await createAdminClient();
+    const { data: comments, error } = await supabase
+      .from("comments")
+      .select("*")
+      .eq("channel_id", channelId)
+      .is("is_question", null)
+      .order("published_at", { ascending: false });
 
-      // Get the latest processed comment's published_at date
-      const { data: latestComment } = await supabase
-        .from("comments")
-        .select("published_at")
-        .is("question_confidence", null)
-        .order("published_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      // If we have a latest comment, only get comments newer than that
-      const query = supabase
-        .from("comments")
-        .select("*")
-        .is("question_confidence", null);
-
-      if (latestComment?.published_at) {
-        query.gt("published_at", latestComment.published_at);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      return data.map((comment) => ({
-        id: comment.id,
-        videoId: comment.video_id,
-        author: comment.author,
-        content: comment.content,
-        publishedAt: comment.published_at,
-        isQuestion: comment.is_question,
-        questionConfidence: comment.question_confidence,
-      }));
-    } catch (error) {
-      console.error("Error getting unprocessed comments:", error);
+    if (error) {
+      console.error("Error fetching unprocessed comments:", error);
       throw error;
     }
+
+    console.log(`Found ${comments.length} unprocessed comments`);
+    console.log("Sample comments:", comments.slice(0, 3).map(c => ({
+      id: c.id,
+      is_question: c.is_question,
+      question_confidence: c.question_confidence
+    })));
+
+    return comments;
   }
 
   /**
    * Process all unprocessed comments
    */
-  static async processUnprocessedComments(): Promise<void> {
+  static async processUnprocessedComments(channelId: string): Promise<void> {
     try {
-      const comments = await this.getUnprocessedComments();
-
+      const comments = await this.getUnprocessedComments(channelId);
       await this.processCommentsBatch(comments);
     } catch (error) {
       console.error("Error processing unprocessed comments:", error);
       throw error;
+    }
+  }
+
+  static async markCommentAsProcessed(
+    commentId: string,
+    isQuestion: boolean,
+    confidence: number
+  ): Promise<void> {
+    const supabase = await createAdminClient();
+    const update: CommentUpdate = {
+      is_question: isQuestion,
+      question_confidence: confidence,
+    };
+
+    const { error } = await supabase
+      .from("comments")
+      .update(update)
+      .eq("id", commentId);
+
+    if (error) {
+      console.error("Error marking comment as processed:", error);
+      throw error;
+    }
+  }
+
+  static async detectQuestions(comments: Comment[]): Promise<void> {
+    for (const comment of comments) {
+      try {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content: "You are a question detection system. Analyze the given text and determine if it's a question. Respond with a JSON object containing 'isQuestion' (boolean) and 'confidence' (number between 0 and 1).",
+            },
+            {
+              role: "user",
+              content: comment.content,
+            },
+          ],
+          response_format: { type: "json_object" },
+        });
+
+        const result = JSON.parse(response.choices[0].message.content || "{}");
+        await this.markCommentAsProcessed(
+          comment.id,
+          result.isQuestion,
+          result.confidence
+        );
+      } catch (error) {
+        console.error(`Error processing comment ${comment.id}:`, error);
+      }
     }
   }
 }

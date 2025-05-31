@@ -1,8 +1,10 @@
-import { YoutubeComment } from "@models/youtube-comment";
+import { Database } from '@supabase/database.types';
 import { createAdminClient } from "@lib/supabase/server";
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY || "";
+
+type Comment = Database['public']['Tables']['comments']['Insert'];
 
 interface CommentThread {
   id: string;
@@ -25,125 +27,100 @@ export class YoutubeCommentsService {
   static async getChannelComments(
     channelId: string,
     afterDate?: string
-  ): Promise<YoutubeComment[]> {
+  ): Promise<Comment[]> {
     console.log("Starting getChannelComments for channel:", channelId);
-    const comments: YoutubeComment[] = [];
+    const comments: Comment[] = [];
     let nextPageToken: string | undefined;
     let pageCount = 0;
 
     do {
-      pageCount++;
-      console.log(`Fetching comments page ${pageCount}...`);
-
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-      const params = new URLSearchParams({
-        part: "snippet",
-        allThreadsRelatedToChannelId: channelId,
-        maxResults: "100",
-        publishedAfter: afterDate ?? oneYearAgo.toISOString(),
-        key: YOUTUBE_DATA_API_KEY,
-        order: "time",
-        sortOrder: "descending",
-      });
-
-      if (nextPageToken) {
-        params.set("pageToken", nextPageToken);
-      }
-
-      console.log(
-        `Fetching comments after ${afterDate ?? oneYearAgo.toISOString()}`
-      );
-
-      const response = await fetch(
-        `${YOUTUBE_DATA_API_URL}/commentThreads?${params.toString()}`
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("YouTube API error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: JSON.stringify(errorData) ?? "Unknown error",
-        });
-        throw new Error(
-          `Failed to fetch channel comments: ${response.status} ${response.statusText}`
+      try {
+        const response = await fetch(
+          `${YOUTUBE_DATA_API_URL}/search?key=${YOUTUBE_DATA_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50${
+            nextPageToken ? `&pageToken=${nextPageToken}` : ""
+          }`
         );
-      }
 
-      const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      nextPageToken = data.nextPageToken;
+        const data = await response.json();
+        console.log(`Fetched page ${++pageCount} of comments`);
 
-      if (!data.items) {
-        console.log("No items in response, continuing...");
-        continue;
-      }
+        if (!data.items || data.items.length === 0) {
+          console.log("No more comments found");
+          break;
+        }
 
-      console.log("Comments received:", data.items.length);
-      // Log the first few comments to debug
-      console.log("Sample comments:", data.items.slice(0, 3).map((item: CommentThread) => ({
-        videoId: item.snippet.videoId,
-        content: item.snippet.topLevelComment.snippet.textDisplay,
-        author: item.snippet.topLevelComment.snippet.authorDisplayName
-      })));
+        // Get comments for each video
+        for (const item of data.items) {
+          if (item.id.kind === "youtube#video") {
+            const videoId = item.id.videoId;
+            const videoComments = await this.getVideoComments(videoId, channelId);
+            comments.push(...videoComments);
+          }
+        }
 
-      const newComments = data.items.map((item: CommentThread) => ({
-        id: item.id,
-        videoId: item.snippet.videoId,
-        author: item.snippet.topLevelComment.snippet.authorDisplayName,
-        content: item.snippet.topLevelComment.snippet.textDisplay,
-        publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-      }));
-
-      console.log(
-        `Found ${newComments.length} new comments on page ${pageCount}`
-      );
-      comments.push(...newComments);
-
-      if (
-        afterDate &&
-        newComments.length > 0 &&
-        new Date(newComments[newComments.length - 1].publishedAt) <=
-          new Date(afterDate)
-      ) {
-        console.log(
-          `Found comments older than ${afterDate} (oldest in this page: ${
-            newComments[newComments.length - 1].publishedAt
-          }), stopping pagination`
-        );
-        break;
-      }
-
-      if (!nextPageToken) {
-        console.log("No more pages to fetch");
-        break;
+        nextPageToken = data.nextPageToken;
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        throw error;
       }
     } while (nextPageToken);
 
-    console.log(`Finished fetching comments. Total: ${comments.length}`);
     return comments;
+  }
+
+  private static async getVideoComments(videoId: string, channelId: string): Promise<Comment[]> {
+    try {
+      const response = await fetch(
+        `${YOUTUBE_DATA_API_URL}/commentThreads?key=${YOUTUBE_DATA_API_KEY}&videoId=${videoId}&part=snippet&maxResults=100`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`Fetched ${data.items?.length || 0} comments for video ${videoId}`);
+
+      if (!data.items || data.items.length === 0) {
+        return [];
+      }
+
+      return data.items.map((item: CommentThread) => ({
+        id: item.id,
+        video_id: item.snippet.videoId,
+        channel_id: channelId,
+        author: item.snippet.topLevelComment.snippet.authorDisplayName,
+        content: item.snippet.topLevelComment.snippet.textDisplay,
+        published_at: item.snippet.topLevelComment.snippet.publishedAt,
+        is_question: false,
+        question_confidence: null,
+        cluster_id: null,
+      }));
+    } catch (error) {
+      console.error(`Error fetching comments for video ${videoId}:`, error);
+      return [];
+    }
   }
 
   /**
    * Store comments in Supabase
    */
-  static async storeComments(comments: YoutubeComment[]): Promise<void> {
+  static async storeComments(channelId: string, comments: Comment[]): Promise<void> {
     try {
       console.log(`Starting to store ${comments.length} comments...`);
+      console.log("Channel ID:", channelId);
+      console.log("Sample comment:", comments[0]);
+      
       const supabase = await createAdminClient();
 
       const { error } = await supabase.from("comments").upsert(
         comments.map((comment) => ({
-          id: comment.id,
-          video_id: comment.videoId,
-          author: comment.author,
-          content: comment.content,
-          published_at: comment.publishedAt,
-          is_question: comment.isQuestion || false,
-          question_confidence: comment.questionConfidence || null,
-          cluster_id: comment.clusterId || null,
+          ...comment,
+          channel_id: channelId,
         })),
         { onConflict: "id" }
       );

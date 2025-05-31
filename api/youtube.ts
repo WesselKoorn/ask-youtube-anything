@@ -6,8 +6,11 @@ import { YoutubeCommentsService } from "@api/services/youtube-comments-service";
 import { QuestionDetectionService } from "@api/services/question-detection-service";
 import { QuestionClusteringService } from "@api/services/question-clustering-service";
 import { createAdminClient } from "@lib/supabase/server";
+import { Database } from "@supabase/database.types";
 
 const MAX_VIDEOS = 50;
+
+type Video = Database["public"]["Tables"]["videos"]["Row"];
 
 export async function getChannelId(channelUrl: string): Promise<string> {
   try {
@@ -89,7 +92,8 @@ export async function getLastVideos(
     const filteredVideos = latestVideo?.published_at
       ? videos.filter(
           (video) =>
-            new Date(video.publishedAt) > new Date(latestVideo.published_at)
+            new Date(video.publishedAt) >
+            new Date(latestVideo.published_at ?? "")
         )
       : videos;
     console.log(`Filtered to ${filteredVideos.length} new videos`);
@@ -110,19 +114,19 @@ export async function getLastVideos(
     console.log("Getting channel comments...");
     const comments = await YoutubeCommentsService.getChannelComments(
       channelId,
-      latestVideo?.published_at
+      latestVideo?.published_at ?? ""
     );
     console.log(`Got ${comments.length} comments`);
 
     // Store comments in Supabase.
     console.log("Storing comments in Supabase...");
-    await YoutubeCommentsService.storeComments(comments);
+    await YoutubeCommentsService.storeComments(channelId, comments);
     console.log("Comments stored successfully");
 
     // Process comments through question detection.
     console.log("Getting unprocessed comments...");
     const unprocessedComments =
-      await QuestionDetectionService.getUnprocessedComments();
+      await QuestionDetectionService.getUnprocessedComments(channelId);
     console.log(`Found ${unprocessedComments.length} unprocessed comments`);
 
     // Process comments through question detection.
@@ -132,7 +136,7 @@ export async function getLastVideos(
 
     // Process questions through clustering.
     console.log("Processing questions through clustering...");
-    await QuestionClusteringService.processUnclusteredQuestions();
+    await QuestionClusteringService.processUnclusteredQuestions(channelId);
     console.log("Question clustering complete");
 
     // Store new videos in Supabase.
@@ -171,4 +175,20 @@ export async function getLastVideos(
     console.error("Error in getLastVideos:", error);
     throw error;
   }
+}
+
+export async function getChannelVideos(channelId: string): Promise<Video[]> {
+  const supabase = await createAdminClient();
+  const { data: videos, error } = await supabase
+    .from("videos")
+    .select("*")
+    .eq("channel_id", channelId)
+    .order("published_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching channel videos:", error);
+    throw error;
+  }
+
+  return videos;
 }

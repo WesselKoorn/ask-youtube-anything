@@ -1,8 +1,8 @@
-export interface FAQQuestion {
-  id: string;
-  canonicalQuestion: string;
-  clusterId: string;
+import { Database } from "@supabase/database.types";
+
+type BaseQuestion = Database['public']['Tables']['questions']['Row'];
+
+export interface FAQQuestion extends BaseQuestion {
   frequency: number;
-  videoId?: string;
-  lastUpdated: Date;
+  lastUpdated: string;
 } 

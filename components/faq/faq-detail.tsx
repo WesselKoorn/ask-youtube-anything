@@ -12,7 +12,7 @@ export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps
     <div className={styles.detail}>
       <div className={styles.mainQuestion}>
         <div className={styles.header}>
-          <h1 className={styles.title}>{question.canonicalQuestion}</h1>
+          <h1 className={styles.title}>{question.canonical_question}</h1>
           <Link href="/faq" className={styles.backLink}>
             ← Back to FAQs
           </Link>
@@ -37,7 +37,7 @@ export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps
               >
                 <div className={styles.relatedHeader}>
                   <h3 className={styles.relatedQuestion}>
-                    {relatedQuestion.canonicalQuestion}
+                    {relatedQuestion.canonical_question}
                   </h3>
                   <div className={styles.metadata}>
                     <span>Asked {relatedQuestion.frequency} times</span>

@@ -20,7 +20,7 @@ export default function FAQList({ faqs }: FAQListProps) {
       {faqs.map((faq) => (
         <Link key={faq.id} href={`/faq/${faq.id}`} className={styles.questionItem}>
           <div className={styles.questionHeader}>
-            <h3 className={styles.questionTitle}>{faq.canonicalQuestion}</h3>
+            <h3 className={styles.questionTitle}>{faq.canonical_question}</h3>
           </div>
           <div className={styles.metadata}>
             <span>Asked {faq.frequency} times</span>

@@ -1,8 +1,8 @@
-import { YoutubeComment } from "@models/youtube-comment";
 import OpenAI from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { ScoredPineconeRecord } from "@pinecone-database/pinecone";
 import { createAdminClient } from "@lib/supabase/server";
+import { Database } from "@supabase/database.types";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -14,8 +14,46 @@ const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
 
-// Get the index for YouTube questions
+// Get or create the index for YouTube questions
 const youtubeQuestionsIndex = pinecone.Index("youtube-questions");
+
+// Ensure the index exists
+async function ensureIndexExists() {
+  try {
+    const indexes = await pinecone.listIndexes();
+
+    if (!indexes.indexes?.some((index) => index.name === "youtube-questions")) {
+      console.log("Creating youtube-questions index...");
+
+      await pinecone.createIndex({
+        name: "youtube-questions",
+        dimension: 1536, // OpenAI text-embedding-3-small dimension
+        metric: "cosine",
+        spec: {
+          serverless: {
+            cloud: "aws",
+            region: "us-east-1",
+          },
+        },
+      });
+
+      console.log("Index created successfully");
+    }
+  } catch (error) {
+    console.error("Error ensuring index exists:", error);
+    throw error;
+  }
+}
+
+// Call this when the service starts
+ensureIndexExists().catch(console.error);
+
+type Comment = Database["public"]["Tables"]["comments"]["Row"];
+type Question = Database["public"]["Tables"]["questions"]["Insert"];
+type QuestionCluster =
+  Database["public"]["Tables"]["question_clusters"]["Insert"];
+type QuestionMetric =
+  Database["public"]["Tables"]["question_metrics"]["Insert"];
 
 export class QuestionClusteringService {
   /**
@@ -39,25 +77,28 @@ export class QuestionClusteringService {
    * Create a new cluster for a question
    * @private
    */
-  private static async createCluster(question: string): Promise<string> {
-    try {
-      const supabase = await createAdminClient();
+  private static async createCluster(
+    channelId: string,
+    question: Comment
+  ): Promise<string> {
+    const supabase = await createAdminClient();
+    const cluster: QuestionCluster = {
+      channel_id: channelId,
+      name: question.content,
+    };
 
-      const { data: cluster, error } = await supabase
-        .from("question_clusters")
-        .insert({ name: question })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from("question_clusters")
+      .insert(cluster)
+      .select()
+      .single();
 
-      if (error) {
-        throw error;
-      }
-
-      return cluster.id;
-    } catch (error) {
+    if (error) {
       console.error("Error creating cluster:", error);
       throw error;
     }
+
+    return data.id;
   }
 
   /**
@@ -66,20 +107,22 @@ export class QuestionClusteringService {
    */
   private static async storeCanonicalQuestion(
     question: string,
-    clusterId: string
+    clusterId: string,
+    channelId: string
   ): Promise<string> {
     try {
       const supabase = await createAdminClient();
 
       // Get embedding for the question
       const embedding = await this.getEmbedding(question);
-      
+
       // Create a new question in Supabase
       const { data: questionData, error: questionError } = await supabase
         .from("questions")
         .insert({
           canonical_question: question,
           cluster_id: clusterId,
+          channel_id: channelId,
           pinecone_id: `q_${Date.now()}`,
         })
         .select()
@@ -98,6 +141,7 @@ export class QuestionClusteringService {
             question_id: questionData.id,
             canonical_question: question,
             cluster_id: clusterId,
+            channel_id: channelId,
             created_at: new Date().toISOString(),
           },
         },
@@ -115,6 +159,7 @@ export class QuestionClusteringService {
    */
   static async findSimilarQuestions(
     question: string,
+    channelId: string,
     threshold: number = 0.8
   ): Promise<{ questionId: string; similarity: number }[]> {
     try {
@@ -123,6 +168,9 @@ export class QuestionClusteringService {
         vector: embedding,
         topK: 5,
         includeMetadata: true,
+        filter: {
+          channel_id: channelId,
+        },
       });
       return results.matches
         .filter(
@@ -143,7 +191,7 @@ export class QuestionClusteringService {
    * @private
    */
   private static async processQuestionsBatch(
-    comments: YoutubeComment[]
+    comments: Comment[]
   ): Promise<void> {
     try {
       const supabase = await createAdminClient();
@@ -151,30 +199,39 @@ export class QuestionClusteringService {
       // Filter for comments that are questions with high confidence
       const questions = comments.filter(
         (comment) =>
-          comment.isQuestion && (comment.questionConfidence || 0) > 0.8
+          comment.is_question && (comment.question_confidence || 0) > 0.6
       );
       for (const question of questions) {
         // Find similar questions
         const similarQuestions = await this.findSimilarQuestions(
-          question.content
+          question.content,
+          question.channel_id
         );
         if (similarQuestions.length > 0) {
           // Question is similar to existing ones, update metrics
-          const { error } = await supabase.from("question_metrics").upsert(
-            similarQuestions.map((similar) => ({
-              question_id: similar.questionId,
-              video_id: question.videoId,
-              frequency: 1,
-            })),
-            { onConflict: "question_id,video_id" }
-          );
+          const metrics: QuestionMetric[] = similarQuestions.map((similar) => ({
+            question_id: similar.questionId,
+            video_id: question.video_id,
+            channel_id: question.channel_id,
+            frequency: 1,
+          }));
+          const { error } = await supabase
+            .from("question_metrics")
+            .upsert(metrics, { onConflict: "question_id,video_id" });
           if (error) {
             throw error;
           }
         } else {
           // Create new cluster and canonical question
-          const clusterId = await this.createCluster(question.content);
-          await this.storeCanonicalQuestion(question.content, clusterId);
+          const clusterId = await this.createCluster(
+            question.channel_id,
+            question
+          );
+          await this.storeCanonicalQuestion(
+            question.content,
+            clusterId,
+            question.channel_id
+          );
         }
       }
     } catch (error) {
@@ -186,7 +243,7 @@ export class QuestionClusteringService {
   /**
    * Process all questions that haven't been clustered yet
    */
-  static async processUnclusteredQuestions(): Promise<void> {
+  static async processUnclusteredQuestions(channelId: string): Promise<void> {
     try {
       const supabase = await createAdminClient();
 
@@ -194,20 +251,13 @@ export class QuestionClusteringService {
         .from("comments")
         .select("*")
         .eq("is_question", true)
+        .eq("channel_id", channelId)
+        .gt("question_confidence", 0.6)
         .is("cluster_id", null);
       if (error) {
         throw error;
       }
-      const youtubeComments: YoutubeComment[] = comments.map((comment) => ({
-        id: comment.id,
-        videoId: comment.video_id,
-        author: comment.author,
-        content: comment.content,
-        publishedAt: comment.published_at,
-        isQuestion: comment.is_question,
-        questionConfidence: comment.question_confidence,
-      }));
-      await this.processQuestionsBatch(youtubeComments);
+      await this.processQuestionsBatch(comments);
     } catch (error) {
       console.error("Error processing unclustered questions:", error);
       throw error;
