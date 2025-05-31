@@ -108,7 +108,7 @@ export class QuestionDetectionService {
       .from("comments")
       .select("*")
       .eq("channel_id", channelId)
-      .is("is_question", null)
+      .is("question_confidence", null)
       .order("published_at", { ascending: false });
 
     if (error) {
