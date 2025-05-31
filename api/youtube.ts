@@ -7,6 +7,7 @@ import { QuestionDetectionService } from "@api/services/question-detection-servi
 import { QuestionClusteringService } from "@api/services/question-clustering-service";
 import { createAdminClient } from "@lib/supabase/server";
 import { Database } from "@supabase/database.types";
+import { isDateAfter } from "@lib/utils";
 
 const MAX_VIDEOS = 50;
 
@@ -88,19 +89,20 @@ export async function getLastVideos(
     );
     console.log(`Fetched ${videos.length} videos from playlist`);
 
+    console.log("Videos:", videos);
+
     // Filter videos by date if we have a latest video.
-    const filteredVideos = latestVideo?.published_at
-      ? videos.filter(
-          (video) =>
-            new Date(video.publishedAt) >
-            new Date(latestVideo.published_at ?? "")
-        )
-      : videos;
+    const filteredVideos =
+      latestVideo?.published_at != null
+        ? videos.filter((video) =>
+            isDateAfter(video.publishedAt, latestVideo.published_at!)
+          )
+        : videos;
     console.log(`Filtered to ${filteredVideos.length} new videos`);
 
     if (filteredVideos.length === 0) {
-      console.log("No new videos found, returning all videos");
-      return videos; // Return all videos if no new ones.
+      console.log("No new videos found, skipping processing");
+      return []; // Return empty array if no new videos
     }
 
     // Get transcriptions for new videos.
@@ -110,34 +112,45 @@ export async function getLastVideos(
     );
     console.log(`Got ${transcriptions.length} transcriptions`);
 
-    // Get all comments of the channel.
+    // Get latest comment.
+    const latestComment = await YoutubeCommentsService.getLatestComment(
+      channelId
+    );
+
+    console.log("Latest comment:", latestComment);
+
+    // Get comments only for new videos
     console.log("Getting channel comments...");
     const comments = await YoutubeCommentsService.getChannelComments(
       channelId,
-      latestVideo?.published_at ?? ""
+      latestComment?.published_at ?? ""
     );
     console.log(`Got ${comments.length} comments`);
 
-    // Store comments in Supabase.
-    console.log("Storing comments in Supabase...");
-    await YoutubeCommentsService.storeComments(channelId, comments);
-    console.log("Comments stored successfully");
+    if (comments.length > 0) {
+      // Store comments in Supabase.
+      console.log("Storing comments in Supabase...");
+      await YoutubeCommentsService.storeComments(channelId, comments);
+      console.log("Comments stored successfully");
 
-    // Process comments through question detection.
-    console.log("Getting unprocessed comments...");
-    const unprocessedComments =
-      await QuestionDetectionService.getUnprocessedComments(channelId);
-    console.log(`Found ${unprocessedComments.length} unprocessed comments`);
+      // Process comments through question detection.
+      console.log("Getting unprocessed comments...");
+      const unprocessedComments =
+        await QuestionDetectionService.getUnprocessedComments(channelId);
+      console.log(`Found ${unprocessedComments.length} unprocessed comments`);
 
-    // Process comments through question detection.
-    console.log("Processing comments through question detection...");
-    await QuestionDetectionService.processCommentsBatch(unprocessedComments);
-    console.log("Question detection complete");
+      // Process comments through question detection.
+      console.log("Processing comments through question detection...");
+      await QuestionDetectionService.processCommentsBatch(unprocessedComments);
+      console.log("Question detection complete");
 
-    // Process questions through clustering.
-    console.log("Processing questions through clustering...");
-    await QuestionClusteringService.processUnclusteredQuestions(channelId);
-    console.log("Question clustering complete");
+      // Process questions through clustering.
+      console.log("Processing questions through clustering...");
+      await QuestionClusteringService.processUnclusteredQuestions(channelId);
+      console.log("Question clustering complete");
+    } else {
+      console.log("No new comments to process");
+    }
 
     // Store new videos in Supabase.
     console.log("Storing new videos in Supabase...");
