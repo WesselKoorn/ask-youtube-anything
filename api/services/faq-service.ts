@@ -59,7 +59,10 @@ export class FAQService {
       }
 
       const { data, error } = await query;
+
       if (error) throw error;
+
+      console.log("FAQ data:", data);
 
       // Transform and aggregate the data
       const faqQuestions = (data as QuestionWithMetrics[]).map((question) => {

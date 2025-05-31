@@ -108,7 +108,8 @@ export class QuestionClusteringService {
   private static async storeCanonicalQuestion(
     question: string,
     clusterId: string,
-    channelId: string
+    channelId: string,
+    videoId: string
   ): Promise<string> {
     try {
       const supabase = await createAdminClient();
@@ -147,6 +148,22 @@ export class QuestionClusteringService {
         },
       ]);
 
+      // Create initial metric entry
+      const { error: metricError } = await supabase
+        .from("question_metrics")
+        .insert({
+          question_id: questionData.id,
+          video_id: videoId,
+          channel_id: channelId,
+          frequency: 1,
+          last_updated: new Date().toISOString()
+        });
+
+      if (metricError) {
+        console.error("Error creating initial metric:", metricError);
+        throw metricError;
+      }
+
       return questionData.id;
     } catch (error) {
       console.error("Error storing canonical question:", error);
@@ -160,7 +177,7 @@ export class QuestionClusteringService {
   static async findSimilarQuestions(
     question: string,
     channelId: string,
-    threshold: number = 0.8
+    threshold: number = 0.7
   ): Promise<{ questionId: string; similarity: number }[]> {
     try {
       const embedding = await this.getEmbedding(question);
@@ -171,6 +188,13 @@ export class QuestionClusteringService {
         filter: {
           channel_id: channelId,
         },
+      });
+      console.log("Similarity search results:", {
+        question,
+        matches: results.matches.map(m => ({
+          score: m.score,
+          question: m.metadata?.canonical_question
+        }))
       });
       return results.matches
         .filter(
@@ -230,7 +254,8 @@ export class QuestionClusteringService {
           await this.storeCanonicalQuestion(
             question.content,
             clusterId,
-            question.channel_id
+            question.channel_id,
+            question.video_id
           );
         }
       }
