@@ -54,6 +54,7 @@ export class YoutubeCommentsService {
     const comments: Comment[] = [];
     let nextPageToken: string | undefined;
     let pageCount = 0;
+    const seenCommentIds = new Set<string>();
 
     do {
       try {
@@ -69,6 +70,8 @@ export class YoutubeCommentsService {
 
         const data = await response.json();
         console.log(`Fetched page ${++pageCount} of comments`);
+        console.log(`Page ${pageCount} token:`, nextPageToken);
+        console.log(`Page ${pageCount} items:`, data.items?.length || 0);
 
         if (!data.items || data.items.length === 0) {
           console.log("No more comments found");
@@ -88,6 +91,23 @@ export class YoutubeCommentsService {
           cluster_id: null,
         }));
 
+        // Log any duplicate IDs in this page
+        const duplicateIds = newComments
+          .filter((comment: Comment) => seenCommentIds.has(comment.id))
+          .map((comment: Comment) => comment.id);
+
+        if (duplicateIds.length > 0) {
+          console.log(
+            `Found ${duplicateIds.length} duplicate IDs in page ${pageCount}:`,
+            duplicateIds
+          );
+        }
+
+        // Add new comment IDs to seen set
+        newComments.forEach((comment: Comment) =>
+          seenCommentIds.add(comment.id)
+        );
+
         // Filter by date if needed
         const filteredComments = afterDate
           ? newComments.filter((comment: Comment) =>
@@ -96,6 +116,7 @@ export class YoutubeCommentsService {
           : newComments;
 
         comments.push(...filteredComments);
+        console.log(`Total unique comments so far: ${seenCommentIds.size}`);
 
         nextPageToken = data.nextPageToken;
       } catch (error) {
@@ -103,6 +124,15 @@ export class YoutubeCommentsService {
         throw error;
       }
     } while (nextPageToken);
+
+    console.log(`Finished fetching comments. Total pages: ${pageCount}`);
+    console.log(`Total comments collected: ${comments.length}`);
+    console.log(`Total unique comment IDs: ${seenCommentIds.size}`);
+    if (comments.length !== seenCommentIds.size) {
+      console.log(
+        "WARNING: Number of comments doesn't match number of unique IDs!"
+      );
+    }
 
     return comments;
   }
@@ -119,10 +149,25 @@ export class YoutubeCommentsService {
       console.log("Channel ID:", channelId);
       console.log("Sample comment:", comments[0]);
 
+      // Deduplicate comments by ID, keeping the most recent version
+      const uniqueComments = Array.from(
+        new Map(
+          comments
+            .sort(
+              (a, b) =>
+                new Date(b.published_at).getTime() -
+                new Date(a.published_at).getTime()
+            )
+            .map((comment) => [comment.id, comment])
+        ).values()
+      );
+
+      console.log(`Deduplicated to ${uniqueComments.length} unique comments`);
+
       const supabase = await createAdminClient();
 
       const { error } = await supabase.from("comments").upsert(
-        comments.map((comment) => ({
+        uniqueComments.map((comment) => ({
           ...comment,
           channel_id: channelId,
         })),

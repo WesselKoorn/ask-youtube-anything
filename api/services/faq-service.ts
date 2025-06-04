@@ -1,6 +1,7 @@
-import { Database } from '@supabase/database.types';
+import { Database } from "@supabase/database.types";
 import { createAdminClient } from "@lib/supabase/server";
 import { FAQQuestion } from "@models/faq-question";
+import { YoutubeComment } from "@models/youtube-comment";
 
 type FAQFilter = {
   videoId?: string;
@@ -8,22 +9,27 @@ type FAQFilter = {
   endDate?: Date;
   minFrequency?: number;
   searchQuery?: string;
-  channelId: string;
 };
 
-type QuestionWithMetrics = Database['public']['Tables']['questions']['Row'] & {
-  question_metrics: Database['public']['Tables']['question_metrics']['Row'][];
+type QuestionWithMetrics = Database["public"]["Tables"]["questions"]["Row"] & {
+  question_metrics: Database["public"]["Tables"]["question_metrics"]["Row"][];
 };
 
 export class FAQService {
   /**
    * Get FAQs for a specific channel
    */
-  static async getChannelFAQs(filter: FAQFilter): Promise<FAQQuestion[]> {
+  static async getChannelFAQs(
+    channelId: string,
+    filter?: FAQFilter
+  ): Promise<FAQQuestion[]> {
     try {
       const supabase = await createAdminClient();
 
-      let query = supabase.from("questions").select(`
+      let query = supabase
+        .from("questions")
+        .select(
+          `
           id,
           canonical_question,
           cluster_id,
@@ -35,8 +41,9 @@ export class FAQService {
             frequency,
             last_updated
           )
-        `)
-        .eq("channel_id", filter.channelId);
+        `
+        )
+        .eq("channel_id", channelId);
 
       if (filter?.videoId) {
         query = query.eq("question_metrics.video_id", filter.videoId);
@@ -74,7 +81,7 @@ export class FAQService {
         );
         const lastUpdated = question.question_metrics.reduce(
           (latest, metric) => {
-            const metricDate = new Date(metric.last_updated || '');
+            const metricDate = new Date(metric.last_updated || "");
             return metricDate > latest ? metricDate : latest;
           },
           new Date(0)
@@ -83,7 +90,7 @@ export class FAQService {
         return {
           ...question,
           frequency: totalFrequency,
-          lastUpdated: lastUpdated.toISOString()
+          lastUpdated: lastUpdated.toISOString(),
         };
       });
 
@@ -139,7 +146,7 @@ export class FAQService {
         );
         const lastUpdated = question.question_metrics.reduce(
           (latest, metric) => {
-            const metricDate = new Date(metric.last_updated || '');
+            const metricDate = new Date(metric.last_updated || "");
             return metricDate > latest ? metricDate : latest;
           },
           new Date(0)
@@ -148,7 +155,7 @@ export class FAQService {
         return {
           ...question,
           frequency: totalFrequency,
-          lastUpdated: lastUpdated.toISOString()
+          lastUpdated: lastUpdated.toISOString(),
         };
       });
 
@@ -175,6 +182,7 @@ export class FAQService {
   static async getQuestionDetails(questionId: string): Promise<{
     question: FAQQuestion;
     relatedQuestions: FAQQuestion[];
+    originalComments: YoutubeComment[];
   }> {
     try {
       const supabase = await createAdminClient();
@@ -208,7 +216,7 @@ export class FAQService {
       );
       const lastUpdated = questionData.question_metrics.reduce(
         (latest, metric) => {
-          const metricDate = new Date(metric.last_updated || '');
+          const metricDate = new Date(metric.last_updated || "");
           return metricDate > latest ? metricDate : latest;
         },
         new Date(0)
@@ -217,7 +225,7 @@ export class FAQService {
       const question: FAQQuestion = {
         ...questionData,
         frequency: totalFrequency,
-        lastUpdated: lastUpdated.toISOString()
+        lastUpdated: lastUpdated.toISOString(),
       };
 
       // Get related questions from the same cluster
@@ -238,19 +246,21 @@ export class FAQService {
           )
         `
         )
-        .eq("cluster_id", question.cluster_id ?? '')
+        .eq("cluster_id", question.cluster_id ?? "")
         .neq("id", questionId);
 
       if (relatedError) throw relatedError;
 
-      const relatedQuestions: FAQQuestion[] = (relatedData as QuestionWithMetrics[]).map((question) => {
+      const relatedQuestions: FAQQuestion[] = (
+        relatedData as QuestionWithMetrics[]
+      ).map((question) => {
         const totalFrequency = question.question_metrics.reduce(
           (sum, metric) => sum + (metric.frequency || 0),
           0
         );
         const lastUpdated = question.question_metrics.reduce(
           (latest, metric) => {
-            const metricDate = new Date(metric.last_updated || '');
+            const metricDate = new Date(metric.last_updated || "");
             return metricDate > latest ? metricDate : latest;
           },
           new Date(0)
@@ -259,18 +269,32 @@ export class FAQService {
         return {
           ...question,
           frequency: totalFrequency,
-          lastUpdated: lastUpdated.toISOString()
+          lastUpdated: lastUpdated.toISOString(),
         };
       });
 
-      return { question, relatedQuestions };
+      // Get original comments for this question cluster
+      const { data: commentsData, error: commentsError } = await supabase
+        .from("comments")
+        .select("*")
+        .eq("is_question", true)
+        .in(
+          "video_id",
+          questionData.question_metrics.map((metric) => metric.video_id)
+        );
+
+      if (commentsError) throw commentsError;
+
+      return { question, relatedQuestions, originalComments: commentsData };
     } catch (error) {
       console.error("Error getting question details:", error);
       throw error;
     }
   }
 
-  static async getTopQuestions(channelId: string): Promise<Database['public']['Tables']['question_clusters']['Row'][]> {
+  static async getTopQuestions(
+    channelId: string
+  ): Promise<Database["public"]["Tables"]["question_clusters"]["Row"][]> {
     const supabase = await createAdminClient();
     const { data: clusters, error } = await supabase
       .from("question_clusters")
@@ -293,15 +317,18 @@ export class FAQService {
     channelId: string
   ): Promise<void> {
     const supabase = await createAdminClient();
-    const questionMetric: Database['public']['Tables']['question_metrics']['Insert'] = {
-      question_id: questionId,
-      video_id: videoId,
-      channel_id: channelId,
-      frequency: 1,
-      last_updated: new Date().toISOString()
-    };
+    const questionMetric: Database["public"]["Tables"]["question_metrics"]["Insert"] =
+      {
+        question_id: questionId,
+        video_id: videoId,
+        channel_id: channelId,
+        frequency: 1,
+        last_updated: new Date().toISOString(),
+      };
 
-    const { error } = await supabase.from("question_metrics").insert(questionMetric);
+    const { error } = await supabase
+      .from("question_metrics")
+      .insert(questionMetric);
 
     if (error) {
       console.error("Error recording question metric:", error);

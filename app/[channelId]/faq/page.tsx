@@ -2,17 +2,17 @@ import { getChannelFAQs } from "@api/faq";
 import { FAQFilter } from "@models/faq-filter";
 import FAQList from "@components/faq/faq-list";
 import FAQFilters from "@components/faq/faq-filters";
-import { notFound } from "next/navigation";
 
 export default async function FAQPage({
   params,
   searchParams,
 }: {
-  params: { channelId: string };
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: Promise<{ channelId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { channelId } = params;
-  const { videoId, startDate, endDate, searchQuery, minFrequency } = searchParams;
+  const { channelId } = await params;
+  const { videoId, startDate, endDate, searchQuery, minFrequency } =
+    await searchParams;
 
   const filter: FAQFilter = {
     channelId,
@@ -23,7 +23,7 @@ export default async function FAQPage({
     minFrequency: minFrequency ? parseInt(minFrequency as string) : undefined,
   };
 
-  const faqs = await getChannelFAQs(filter);
+  const faqs = await getChannelFAQs(channelId, filter);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -32,4 +32,4 @@ export default async function FAQPage({
       <FAQList faqs={faqs} />
     </div>
   );
-} 
+}

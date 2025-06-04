@@ -1,8 +1,8 @@
 import { FAQService } from "./services/faq-service";
 import { FAQFilter } from "@models/faq-filter";
 
-export async function getChannelFAQs(filter?: FAQFilter) {
-  return FAQService.getChannelFAQs(filter);
+export async function getChannelFAQs(channelId: string, filter?: FAQFilter) {
+  return FAQService.getChannelFAQs(channelId, filter);
 }
 
 export async function getVideoFAQs(

@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { FAQQuestion } from "@models/faq-question";
+import { YoutubeComment } from "@models/youtube-comment";
 import styles from "./faq-detail.module.scss";
+import OriginalComments from "./original-comments";
 
 interface FAQDetailProps {
   question: FAQQuestion;
   relatedQuestions: FAQQuestion[];
+  originalComments: YoutubeComment[];
 }
 
-export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps) {
+export default function FAQDetail({ question, relatedQuestions, originalComments }: FAQDetailProps) {
   return (
     <div className={styles.detail}>
       <div className={styles.mainQuestion}>
@@ -24,6 +27,8 @@ export default function FAQDetail({ question, relatedQuestions }: FAQDetailProps
           </span>
         </div>
       </div>
+
+      <OriginalComments comments={originalComments} />
 
       {relatedQuestions.length > 0 && (
         <div className={styles.relatedSection}>

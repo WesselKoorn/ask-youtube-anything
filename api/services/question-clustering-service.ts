@@ -156,7 +156,7 @@ export class QuestionClusteringService {
           video_id: videoId,
           channel_id: channelId,
           frequency: 1,
-          last_updated: new Date().toISOString()
+          last_updated: new Date().toISOString(),
         });
 
       if (metricError) {
@@ -189,13 +189,7 @@ export class QuestionClusteringService {
           channel_id: channelId,
         },
       });
-      console.log("Similarity search results:", {
-        question,
-        matches: results.matches.map(m => ({
-          score: m.score,
-          question: m.metadata?.canonical_question
-        }))
-      });
+
       return results.matches
         .filter(
           (match: ScoredPineconeRecord) => (match.score || 0) >= threshold
