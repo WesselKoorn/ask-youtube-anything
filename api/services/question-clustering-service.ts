@@ -3,6 +3,7 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { ScoredPineconeRecord } from "@pinecone-database/pinecone";
 import { createAdminClient } from "@lib/supabase/server";
 import { Database } from "@supabase/database.types";
+import { TextPreprocessingService } from "./text-preprocessing-service";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -62,9 +63,10 @@ export class QuestionClusteringService {
    */
   private static async getEmbedding(text: string): Promise<number[]> {
     try {
+      const processedText = TextPreprocessingService.preprocessText(text);
       const response = await openai.embeddings.create({
         model: "text-embedding-3-small",
-        input: text,
+        input: processedText,
       });
       return response.data[0].embedding;
     } catch (error) {

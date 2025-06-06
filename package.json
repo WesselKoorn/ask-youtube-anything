@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "vitest",
+    "test": "vitest --exclude '**/__tests__/integration/**'",
+    "test:integration": "vitest __tests__/integration/**",
+    "test:all": "vitest run",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
