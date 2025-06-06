@@ -1,14 +1,14 @@
 import OpenAI from "openai";
 import { createAdminClient } from "@lib/supabase/server";
-import { Database } from '@supabase/database.types';
+import { Database } from "@supabase/database.types";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type Comment = Database['public']['Tables']['comments']['Row'];
-type CommentUpdate = Database['public']['Tables']['comments']['Update'];
+type Comment = Database["public"]["Tables"]["comments"]["Row"];
+type CommentUpdate = Database["public"]["Tables"]["comments"]["Update"];
 
 export class QuestionDetectionService {
   /**
@@ -117,11 +117,14 @@ export class QuestionDetectionService {
     }
 
     console.log(`Found ${comments.length} unprocessed comments`);
-    console.log("Sample comments:", comments.slice(0, 3).map(c => ({
-      id: c.id,
-      is_question: c.is_question,
-      question_confidence: c.question_confidence
-    })));
+    console.log(
+      "Sample comments:",
+      comments.slice(0, 3).map((c) => ({
+        id: c.id,
+        is_question: c.is_question,
+        question_confidence: c.question_confidence,
+      }))
+    );
 
     return comments;
   }
@@ -145,6 +148,7 @@ export class QuestionDetectionService {
     confidence: number
   ): Promise<void> {
     const supabase = await createAdminClient();
+
     const update: CommentUpdate = {
       is_question: isQuestion,
       question_confidence: confidence,
@@ -164,12 +168,29 @@ export class QuestionDetectionService {
   static async detectQuestions(comments: Comment[]): Promise<void> {
     for (const comment of comments) {
       try {
+        const result = this.isQuestion(comment.content);
+
+        await this.markCommentAsProcessed(
+          comment.id,
+          result.isQuestion,
+          result.confidence
+        );
+      } catch (error) {
+        console.error(`Error processing comment ${comment.id}:`, error);
+      }
+    }
+  }
+
+  static async detectQuestionsWithAI(comments: Comment[]): Promise<void> {
+    for (const comment of comments) {
+      try {
         const response = await openai.chat.completions.create({
           model: "gpt-4",
           messages: [
             {
               role: "system",
-              content: "You are a question detection system. Analyze the given text and determine if it's a question. Respond with a JSON object containing 'isQuestion' (boolean) and 'confidence' (number between 0 and 1).",
+              content:
+                "You are a question detection system. Analyze the given text and determine if it's a question. Respond with a JSON object containing 'isQuestion' (boolean) and 'confidence' (number between 0 and 1).",
             },
             {
               role: "user",
@@ -180,14 +201,41 @@ export class QuestionDetectionService {
         });
 
         const result = JSON.parse(response.choices[0].message.content || "{}");
+
         await this.markCommentAsProcessed(
           comment.id,
           result.isQuestion,
           result.confidence
         );
       } catch (error) {
-        console.error(`Error processing comment ${comment.id}:`, error);
+        console.error(`Error processing comment with AI ${comment.id}:`, error);
       }
     }
+  }
+
+  private static isQuestion(text: string): {
+    isQuestion: boolean;
+    confidence: number;
+  } {
+    // Check for exclamations first
+    if (text.endsWith('!')) {
+      return { isQuestion: false, confidence: 0.2 };
+    }
+
+    // Common question patterns
+    const patterns = [
+      /^[^.!?]*\?/i, // Ends with question mark
+      /^(what|who|where|when|why|how|can|could|would|should|do|does|did|is|are|was|were|have|has|will|would|should|must|may|might)\b/i, // Starts with question words
+      /^(tell me|explain|describe|define|list|name|give|show|help|advice|suggest|recommend)\b/i, // Starts with question phrases
+    ];
+
+    // Check each pattern
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        return { isQuestion: true, confidence: 0.8 };
+      }
+    }
+
+    return { isQuestion: false, confidence: 0.2 };
   }
 }

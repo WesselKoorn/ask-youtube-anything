@@ -132,7 +132,7 @@ describe("YoutubeService", () => {
 
       await expect(
         YoutubeService.getUploadsPlaylistId("test-channel-id")
-      ).rejects.toThrow("Failed to fetch channel ID");
+      ).rejects.toThrow("Failed to fetch channel test-channel-id");
     });
   });
 
