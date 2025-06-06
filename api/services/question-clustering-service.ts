@@ -178,7 +178,7 @@ export class QuestionClusteringService {
     question: string,
     channelId: string,
     threshold: number = 0.7
-  ): Promise<{ questionId: string; similarity: number }[]> {
+  ): Promise<{ questionId: string; clusterId: string; similarity: number }[]> {
     try {
       const embedding = await this.getEmbedding(question);
       const results = await youtubeQuestionsIndex.query({
@@ -196,6 +196,7 @@ export class QuestionClusteringService {
         )
         .map((match: ScoredPineconeRecord) => ({
           questionId: match.metadata?.question_id as string,
+          clusterId: match.metadata?.cluster_id as string,
           similarity: match.score || 0,
         }));
     } catch (error) {
@@ -233,11 +234,21 @@ export class QuestionClusteringService {
             channel_id: question.channel_id,
             frequency: 1,
           }));
-          const { error } = await supabase
+          const { error: metricsError } = await supabase
             .from("question_metrics")
             .upsert(metrics, { onConflict: "question_id,video_id" });
-          if (error) {
-            throw error;
+          if (metricsError) {
+            throw metricsError;
+          }
+
+          // Update the comment with the cluster_id
+          const { error: commentError } = await supabase
+            .from("comments")
+            .update({ cluster_id: similarQuestions[0].clusterId })
+            .eq("id", question.id);
+
+          if (commentError) {
+            throw commentError;
           }
         } else {
           // Create new cluster and canonical question
@@ -251,6 +262,16 @@ export class QuestionClusteringService {
             question.channel_id,
             question.video_id
           );
+
+          // Update the comment with the new cluster_id
+          const { error: commentError } = await supabase
+            .from("comments")
+            .update({ cluster_id: clusterId })
+            .eq("id", question.id);
+
+          if (commentError) {
+            throw commentError;
+          }
         }
       }
     } catch (error) {

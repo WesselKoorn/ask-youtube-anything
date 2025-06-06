@@ -187,105 +187,96 @@ export class FAQService {
     try {
       const supabase = await createAdminClient();
 
-      // Get the main question
-      const { data: questionData, error: questionError } = await supabase
+      // Get the main question with its cluster_id
+      const { data: question, error: questionError } = await supabase
         .from("questions")
         .select(
           `
-          id,
-          canonical_question,
-          cluster_id,
-          channel_id,
-          created_at,
-          pinecone_id,
-          question_metrics (
-            video_id,
-            frequency,
-            last_updated
-          )
-        `
+        *,
+        question_metrics (
+          video_id,
+          frequency,
+          last_updated
+        )
+      `
         )
         .eq("id", questionId)
         .single();
 
       if (questionError) throw questionError;
+      if (!question) throw new Error("Question not found");
+      if (!question.cluster_id) throw new Error("Question has no cluster_id");
 
-      const totalFrequency = questionData.question_metrics.reduce(
-        (sum, metric) => sum + (metric.frequency || 0),
-        0
-      );
-      const lastUpdated = questionData.question_metrics.reduce(
-        (latest, metric) => {
-          const metricDate = new Date(metric.last_updated || "");
-          return metricDate > latest ? metricDate : latest;
-        },
-        new Date(0)
-      );
-
-      const question: FAQQuestion = {
-        ...questionData,
-        frequency: totalFrequency,
-        lastUpdated: lastUpdated.toISOString(),
-      };
-
-      // Get related questions from the same cluster
-      const { data: relatedData, error: relatedError } = await supabase
+      // Get all questions in the same cluster
+      const { data: relatedQuestionsData, error: relatedError } = await supabase
         .from("questions")
         .select(
           `
-          id,
-          canonical_question,
-          cluster_id,
-          channel_id,
-          created_at,
-          pinecone_id,
-          question_metrics (
-            video_id,
-            frequency,
-            last_updated
-          )
-        `
+        *,
+        question_metrics (
+          video_id,
+          frequency,
+          last_updated
         )
-        .eq("cluster_id", question.cluster_id ?? "")
+      `
+        )
+        .eq("cluster_id", question.cluster_id)
         .neq("id", questionId);
 
       if (relatedError) throw relatedError;
 
+      // Transform related questions to match FAQQuestion type
       const relatedQuestions: FAQQuestion[] = (
-        relatedData as QuestionWithMetrics[]
+        (relatedQuestionsData as QuestionWithMetrics[]) || []
       ).map((question) => {
         const totalFrequency = question.question_metrics.reduce(
-          (sum, metric) => sum + (metric.frequency || 0),
+          (sum: number, metric) => sum + (metric.frequency || 0),
           0
         );
-        const lastUpdated = question.question_metrics.reduce(
-          (latest, metric) => {
+        const lastUpdated = question.question_metrics
+          .reduce((latest: Date, metric) => {
             const metricDate = new Date(metric.last_updated || "");
             return metricDate > latest ? metricDate : latest;
-          },
-          new Date(0)
-        );
+          }, new Date(0))
+          .toISOString();
 
         return {
           ...question,
           frequency: totalFrequency,
-          lastUpdated: lastUpdated.toISOString(),
+          lastUpdated,
         };
       });
 
-      // Get original comments for this question cluster
-      const { data: commentsData, error: commentsError } = await supabase
+      // Get all original comments that are questions in this cluster
+      const { data: originalComments, error: commentsError } = await supabase
         .from("comments")
         .select("*")
+        .eq("cluster_id", question.cluster_id)
         .eq("is_question", true)
-        .in(
-          "video_id",
-          questionData.question_metrics.map((metric) => metric.video_id)
-        );
+        .order("created_at", { ascending: false });
 
       if (commentsError) throw commentsError;
 
-      return { question, relatedQuestions, originalComments: commentsData };
+      // Transform main question to match FAQQuestion type
+      const mainQuestion: FAQQuestion = {
+        ...question,
+        frequency: (question as QuestionWithMetrics).question_metrics.reduce(
+          (sum: number, metric) => sum + (metric.frequency || 0),
+          0
+        ),
+        lastUpdated: (question as QuestionWithMetrics).question_metrics
+          .reduce((latest: Date, metric) => {
+            const metricDate = new Date(metric.last_updated || "");
+            return metricDate > latest ? metricDate : latest;
+          }, new Date(0))
+          .toISOString(),
+      };
+
+      return {
+        question: mainQuestion,
+        relatedQuestions,
+        originalComments: originalComments || [],
+      };
     } catch (error) {
       console.error("Error getting question details:", error);
       throw error;
