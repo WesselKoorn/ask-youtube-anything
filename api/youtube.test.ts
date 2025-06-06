@@ -1,8 +1,12 @@
 import { expect, test, describe, vi, beforeEach } from "vitest";
 import { getChannelId, getLastVideos } from "./youtube";
 import { YoutubeService } from "./services/youtube-service";
+import { YoutubeCommentsService } from "./services/youtube-comments-service";
+import { createAdminClient } from "@lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@supabase/database.types";
 
-// Mock the YoutubeService
+// Mock all required services
 vi.mock("./services/youtube-service", () => ({
   YoutubeService: {
     extractHandleFromUrl: vi.fn(),
@@ -11,6 +15,40 @@ vi.mock("./services/youtube-service", () => ({
     fetchPlaylistVideos: vi.fn(),
     getTranscriptions: vi.fn(),
   },
+}));
+
+vi.mock("./services/youtube-comments-service", () => ({
+  YoutubeCommentsService: {
+    getLatestComment: vi.fn(),
+    getChannelComments: vi.fn(),
+    storeComments: vi.fn(),
+  },
+}));
+
+vi.mock("./services/question-detection-service", () => ({
+  QuestionDetectionService: {
+    getUnprocessedComments: vi.fn(),
+    processCommentsBatch: vi.fn(),
+  },
+}));
+
+vi.mock("./services/question-clustering-service", () => ({
+  QuestionClusteringService: {
+    processUnclusteredQuestions: vi.fn(),
+  },
+}));
+
+// Mock Supabase client
+vi.mock("@lib/supabase/server", () => ({
+  createAdminClient: vi.fn().mockResolvedValue({
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data: null }),
+    upsert: vi.fn().mockResolvedValue({ error: null }),
+  }),
 }));
 
 describe("YouTube Server Actions", () => {
@@ -59,7 +97,6 @@ describe("YouTube Server Actions", () => {
   });
 
   describe("getLastVideos", () => {
-    const mockUrl = "https://www.youtube.com/@testchannel";
     const mockChannelId = "channel123";
     const mockPlaylistId = "playlist123";
     const mockVideos = [
@@ -81,6 +118,23 @@ describe("YouTube Server Actions", () => {
       },
     ];
 
+    beforeEach(() => {
+      // Mock Supabase responses
+      const mockSupabase = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null }),
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      vi.mocked(createAdminClient).mockResolvedValue(
+        mockSupabase as unknown as SupabaseClient<Database>
+      );
+    });
+
     test("successfully gets last videos with transcriptions", async () => {
       vi.mocked(YoutubeService.getUploadsPlaylistId).mockResolvedValue(
         mockPlaylistId
@@ -92,6 +146,12 @@ describe("YouTube Server Actions", () => {
         { videoId: "video1", transcription: "Test transcription 1" },
         { videoId: "video2", transcription: "Test transcription 2" },
       ]);
+      vi.mocked(YoutubeCommentsService.getLatestComment).mockResolvedValue(
+        null
+      );
+      vi.mocked(YoutubeCommentsService.getChannelComments).mockResolvedValue(
+        []
+      );
 
       const result = await getLastVideos(mockChannelId);
 
@@ -104,7 +164,7 @@ describe("YouTube Server Actions", () => {
       );
       expect(YoutubeService.fetchPlaylistVideos).toHaveBeenCalledWith(
         mockPlaylistId,
-        100
+        50
       );
       expect(YoutubeService.getTranscriptions).toHaveBeenCalledWith([
         "video1",
@@ -113,24 +173,14 @@ describe("YouTube Server Actions", () => {
     });
 
     test("throws error when uploads playlist cannot be found", async () => {
-      const mockHandle = "testchannel";
-      vi.mocked(YoutubeService.extractHandleFromUrl).mockReturnValue(
-        mockHandle
-      );
-      vi.mocked(YoutubeService.getChannelId).mockResolvedValue(mockChannelId);
       vi.mocked(YoutubeService.getUploadsPlaylistId).mockResolvedValue(null);
 
-      await expect(getLastVideos(mockUrl)).rejects.toThrow(
-        "Could not find an uploads playlist for channel: https://www.youtube.com/@testchannel"
+      await expect(getLastVideos(mockChannelId)).rejects.toThrow(
+        "Could not find an uploads playlist for channel: channel123"
       );
     });
 
     test("handles missing transcriptions gracefully", async () => {
-      const mockHandle = "testchannel";
-      vi.mocked(YoutubeService.extractHandleFromUrl).mockReturnValue(
-        mockHandle
-      );
-      vi.mocked(YoutubeService.getChannelId).mockResolvedValue(mockChannelId);
       vi.mocked(YoutubeService.getUploadsPlaylistId).mockResolvedValue(
         mockPlaylistId
       );
@@ -141,8 +191,14 @@ describe("YouTube Server Actions", () => {
         { videoId: "video1", transcription: "Test transcription 1" },
         // video2 transcription is missing
       ]);
+      vi.mocked(YoutubeCommentsService.getLatestComment).mockResolvedValue(
+        null
+      );
+      vi.mocked(YoutubeCommentsService.getChannelComments).mockResolvedValue(
+        []
+      );
 
-      const result = await getLastVideos(mockUrl);
+      const result = await getLastVideos(mockChannelId);
 
       expect(result).toHaveLength(2);
       expect(result[0].transcription).toBe("Test transcription 1");

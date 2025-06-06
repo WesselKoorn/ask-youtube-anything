@@ -14,8 +14,10 @@ describe("YoutubeService", () => {
   let mockedData: unknown = {
     items: [
       {
-        id: {
-          channelId: "channel1",
+        id: "channel1",
+        snippet: {
+          title: "Test Channel",
+          customUrl: "@test-handle",
         },
       },
     ],
@@ -56,12 +58,10 @@ describe("YoutubeService", () => {
       expect(result).toBe("channel1");
 
       const expectedUrl =
-        `${YOUTUBE_DATA_API_URL}/search?` +
+        `${YOUTUBE_DATA_API_URL}/channels?` +
         new URLSearchParams({
           part: "snippet",
-          q: "test-handle",
-          type: "channel",
-          maxResults: "1",
+          forHandle: "test-handle",
           key: process.env.YOUTUBE_DATA_API_KEY!,
         }).toString();
       expect(fetch).toHaveBeenCalledWith(expectedUrl);
@@ -72,12 +72,10 @@ describe("YoutubeService", () => {
 
       expect(result).toBe("channel1");
       expect(fetch).toHaveBeenCalledWith(
-        `${YOUTUBE_DATA_API_URL}/search?` +
+        `${YOUTUBE_DATA_API_URL}/channels?` +
           new URLSearchParams({
-            part: "snippet", // was "id"
-            q: "test-handle",
-            type: "channel",
-            maxResults: "1",
+            part: "snippet",
+            forHandle: "test-handle",
             key: process.env.YOUTUBE_DATA_API_KEY!,
           }).toString()
       );
