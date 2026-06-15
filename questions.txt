@@ -1,0 +1,14 @@
+# SEO questions to find answers for, one per line.
+# Lines starting with "#" and blank lines are ignored.
+# Replace these with the client's real keyword/prompt list.
+
+What is RCS?
+How to set up RCS
+What is the difference between RCS and SMS?
+Is RCS secure?
+Will RCS replace SMS?
+How do I switch from RCS back to SMS?
+What is RCS Business Messaging?
+Why isn't my RCS working?
+What are the benefits of RCS for businesses?
+How much does RCS messaging cost?

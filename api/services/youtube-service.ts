@@ -1,3 +1,4 @@
+import { TranscriptCue } from "@models/transcript";
 import { YoutubeVideo } from "@models/youtube-video";
 import { YoutubeTranscript } from "youtube-transcript";
 
@@ -175,9 +176,52 @@ export class YoutubeService {
   }
 
   static async getTranscript(videoId: string): Promise<string> {
+    const cues = await this.getTimedTranscript(videoId);
+
+    return cues.map((cue) => cue.text).join(" ");
+  }
+
+  /**
+   * Like getTranscript, but preserves per-cue timestamps (in seconds).
+   * The YouTube timedtext feed gives `start` and `dur` in seconds, so we pass
+   * them straight through. These timestamps are what make it possible to
+   * deep-link to, and later clip, the exact moment an answer is given.
+   */
+  static async getTimedTranscript(videoId: string): Promise<TranscriptCue[]> {
     const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
 
-    return transcriptionArray.map((item) => item.text).join(" ");
+    return transcriptionArray.map((item) => ({
+      start: item.offset,
+      duration: item.duration,
+      text: item.text,
+    }));
+  }
+
+  /**
+   * Batch variant of getTimedTranscript. Resolves only the videos whose
+   * transcripts could be fetched (failures are dropped, mirroring
+   * getTranscriptions).
+   */
+  static async getTimedTranscriptions(
+    videoIds: string[]
+  ): Promise<{ videoId: string; cues: TranscriptCue[] }[]> {
+    const results = await Promise.allSettled(
+      videoIds.map(async (videoId) => ({
+        videoId,
+        cues: await this.getTimedTranscript(videoId),
+      }))
+    );
+
+    return results
+      .filter(
+        (
+          result
+        ): result is PromiseFulfilledResult<{
+          videoId: string;
+          cues: TranscriptCue[];
+        }> => result.status === "fulfilled"
+      )
+      .map((result) => result.value);
   }
 
   /**
