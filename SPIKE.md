@@ -92,6 +92,26 @@ The report opens with a **coverage** line (how many questions got a confident
 answer) and a per-question table, then lists each clip with its deep-link and
 the transcript excerpt so a human can sanity-check it in one click.
 
+## Rendering clips (prototype)
+
+`clip-report.json` is the handoff to the renderer, which cuts each ranked
+moment into a ready-to-post 9:16 short:
+
+```bash
+brew install ffmpeg                      # cut, reframe, encode
+npm run render-clips                     # top few clips → data/clips/*.mp4
+npm run render-clips -- --all            # every clip in the report
+npm run render-clips -- --no-captions    # skip burned-in captions
+```
+
+For each clip it downloads just the answer segment (`yt-dlp --download-sections`,
+so a 60s clip from a 1-hour video stays small), reframes to 1080×1920 with a
+blurred-fill background, and burns in captions built from the cached transcript
+cues. Captions are rendered to PNG with `@napi-rs/canvas` and composited by
+ffmpeg — Homebrew's ffmpeg ships without libass, so we don't depend on its
+subtitle filter. Use `--no-captions` for channels whose source videos already
+carry their own burned-in captions (e.g. several of TrueDialog's).
+
 ## Cost & limits
 
 - Embeddings/vector DB: none.
@@ -104,8 +124,9 @@ the transcript excerpt so a human can sanity-check it in one click.
 
 ## What this spike deliberately leaves for later
 
-- **Rendering the clips** — `yt-dlp` to pull the source, `ffmpeg` to cut,
-  reframe to 9:16, and burn in captions.
+- **Rendering the clips** — prototyped in `scripts/render-clips.ts` (see
+  "Rendering clips" above); production would add transitions, brand styling,
+  and a configurable caption look.
 - **SEO/AEO packaging** — title/description/`VideoObject` schema for the embed.
 - **Human review UI** — approve clips before publishing.
 - **Publishing** — embed self-hosted clips in articles and/or upload Shorts to
