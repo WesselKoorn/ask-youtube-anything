@@ -16,8 +16,7 @@
     "openai": "^4.79.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "sass": "^1.83.4",
-    "youtube-transcript": "^1.2.1"
+    "sass": "^1.83.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

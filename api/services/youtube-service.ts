@@ -1,6 +1,13 @@
+import { execFile } from "child_process";
+import { constants as fsConstants, promises as fs } from "fs";
+import os from "os";
+import path from "path";
+import { promisify } from "util";
+
 import { TranscriptCue } from "@models/transcript";
 import { YoutubeVideo } from "@models/youtube-video";
-import { YoutubeTranscript } from "youtube-transcript";
+
+const execFileAsync = promisify(execFile);
 
 const YOUTUBE_DATA_API_URL = "https://youtube.googleapis.com/youtube/v3";
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY || "";
@@ -183,18 +190,62 @@ export class YoutubeService {
 
   /**
    * Like getTranscript, but preserves per-cue timestamps (in seconds).
-   * The YouTube timedtext feed gives `start` and `dur` in seconds, so we pass
-   * them straight through. These timestamps are what make it possible to
-   * deep-link to, and later clip, the exact moment an answer is given.
+   *
+   * Captions are pulled with yt-dlp in YouTube's `json3` timedtext format,
+   * which carries exact per-cue start/duration (in ms) — the timestamps that
+   * make it possible to deep-link to, and later clip, the precise moment an
+   * answer is given. (The previous `youtube-transcript` scraper stopped working
+   * against YouTube's current caption endpoint and returned zero cues.)
+   *
+   * Returns an empty array when the video has no English captions (the caller
+   * counts it as unavailable); throws only when yt-dlp itself is missing.
    */
   static async getTimedTranscript(videoId: string): Promise<TranscriptCue[]> {
-    const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
+    const bin = await resolveYtDlpBin();
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `ytcc-${videoId}-`));
 
-    return transcriptionArray.map((item) => ({
-      start: item.offset,
-      duration: item.duration,
-      text: item.text,
-    }));
+    try {
+      await execFileAsync(
+        bin,
+        [
+          "--skip-download",
+          "--no-warnings",
+          "--write-subs",
+          "--write-auto-subs",
+          "--sub-langs",
+          "en.*,en-orig",
+          "--sub-format",
+          "json3",
+          "-o",
+          path.join(tmpDir, "%(id)s.%(ext)s"),
+          "--",
+          videoId,
+        ],
+        { maxBuffer: 64 * 1024 * 1024 }
+      );
+
+      const files = (await fs.readdir(tmpDir)).filter((f) =>
+        f.endsWith(".json3")
+      );
+      if (files.length === 0) return [];
+
+      const raw = await fs.readFile(
+        path.join(tmpDir, pickEnglishSub(files)),
+        "utf8"
+      );
+      return parseJson3Cues(raw);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+        throw new Error(
+          "yt-dlp not found — it is required to fetch timestamped transcripts. " +
+            "Install it (e.g. `brew install yt-dlp`) or set YT_DLP_PATH to its path."
+        );
+      }
+      // Video unavailable / no captions / transient yt-dlp error → no cues.
+      return [];
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   }
 
   /**
@@ -260,4 +311,84 @@ export class YoutubeService {
       return "";
     }
   }
+}
+
+/** Cached path to the yt-dlp binary once resolved. */
+let cachedYtDlpBin: string | null = null;
+
+/**
+ * Locate a yt-dlp binary: honor $YT_DLP_PATH, then common install locations,
+ * then fall back to "yt-dlp" on PATH.
+ */
+async function resolveYtDlpBin(): Promise<string> {
+  if (cachedYtDlpBin) return cachedYtDlpBin;
+
+  const candidates = [
+    process.env.YT_DLP_PATH,
+    path.join(os.homedir(), ".local", "bin", "yt-dlp"),
+    "/opt/homebrew/bin/yt-dlp",
+    "/usr/local/bin/yt-dlp",
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate, fsConstants.X_OK);
+      cachedYtDlpBin = candidate;
+      return candidate;
+    } catch {
+      // not here — try the next candidate
+    }
+  }
+
+  cachedYtDlpBin = "yt-dlp"; // rely on PATH
+  return cachedYtDlpBin;
+}
+
+/** Prefer a manual/auto English track, in a stable order. */
+function pickEnglishSub(files: string[]): string {
+  return (
+    files.find((f) => /\.en\.json3$/.test(f)) ??
+    files.find((f) => /\.en-orig\.json3$/.test(f)) ??
+    files.find((f) => /\.en[-.]/.test(f)) ??
+    files[0]
+  );
+}
+
+interface Json3Event {
+  tStartMs?: number;
+  dDurationMs?: number;
+  segs?: { utf8?: string }[];
+}
+
+/**
+ * Parse YouTube `json3` timedtext into {start, duration, text} cues (seconds).
+ * Skips window-definition events (no segs) and the blank "\n" append events
+ * that auto-captions emit for their rolling-scroll effect.
+ */
+function parseJson3Cues(raw: string): TranscriptCue[] {
+  let data: { events?: Json3Event[] };
+  try {
+    data = JSON.parse(raw) as { events?: Json3Event[] };
+  } catch {
+    return [];
+  }
+
+  const cues: TranscriptCue[] = [];
+  for (const event of data.events ?? []) {
+    if (!event.segs) continue;
+    const text = event.segs
+      .map((seg) => seg.utf8 ?? "")
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) continue;
+
+    cues.push({
+      start: (event.tStartMs ?? 0) / 1000,
+      duration: Math.max(0, (event.dDurationMs ?? 0) / 1000),
+      text,
+    });
+  }
+
+  return cues;
 }

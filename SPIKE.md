@@ -44,10 +44,15 @@ changes.
 
 ```bash
 npm install
+brew install yt-dlp        # required to fetch timestamped transcripts
 cp .env.example .env       # then fill in OPENAI_API_KEY (+ YOUTUBE_DATA_API_KEY for --channel)
 ```
 
 - `OPENAI_API_KEY` — required (the matching step).
+- `yt-dlp` — required: transcripts are pulled from YouTube's `json3` caption
+  feed via yt-dlp. Install it on your PATH (`brew install yt-dlp`) or point
+  `YT_DLP_PATH` at the binary. (This replaced the `youtube-transcript` scraper,
+  which stopped returning cues against YouTube's current caption endpoint.)
 - `YOUTUBE_DATA_API_KEY` — required only to auto-list a channel with `--channel`.
   A free key from a Google Cloud project with the "YouTube Data API v3" enabled.
   Not needed if you pass `--videos`.
@@ -92,10 +97,10 @@ the transcript excerpt so a human can sanity-check it in one click.
 - Embeddings/vector DB: none.
 - LLM: a handful of batched calls (often just one for a small channel). Cost
   scales with model — `gpt-5.5` for best accuracy, `gpt-5.4-mini` to economize.
-- Transcripts come from YouTube's public caption feed and can be rate-limited
-  or missing (captions disabled); those videos are skipped and counted in the
-  report. For production, owner-access captions or the original video files are
-  more reliable.
+- Transcripts are fetched with yt-dlp from YouTube's `json3` caption feed; they
+  can be missing (captions disabled) or rate-limited, and those videos are
+  skipped and counted in the report. For production, owner-access captions or
+  the original video files are more reliable.
 
 ## What this spike deliberately leaves for later
 
