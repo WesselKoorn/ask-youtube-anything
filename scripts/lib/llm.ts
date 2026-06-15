@@ -36,15 +36,29 @@ export async function chatJson<T>(opts: {
 }): Promise<T> {
   const openai = getClient();
 
-  const response = await openai.chat.completions.create({
-    model: opts.model,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: opts.system },
-      { role: "user", content: opts.user },
-    ],
-  });
+  const messages = [
+    { role: "system" as const, content: opts.system },
+    { role: "user" as const, content: opts.user },
+  ];
+
+  // Prefer deterministic output, but some newer models (GPT-5.x) only allow the
+  // default temperature — fall back gracefully if temperature is rejected.
+  let response;
+  try {
+    response = await openai.chat.completions.create({
+      model: opts.model,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages,
+    });
+  } catch (error) {
+    if (!isUnsupportedTemperature(error)) throw error;
+    response = await openai.chat.completions.create({
+      model: opts.model,
+      response_format: { type: "json_object" },
+      messages,
+    });
+  }
 
   const content = response.choices[0]?.message?.content ?? "{}";
 
@@ -55,4 +69,10 @@ export async function chatJson<T>(opts: {
       `Model did not return valid JSON. First 500 chars:\n${content.slice(0, 500)}`
     );
   }
+}
+
+function isUnsupportedTemperature(error: unknown): boolean {
+  const err = error as { param?: string; message?: string };
+
+  return err?.param === "temperature" || /temperature/i.test(err?.message ?? "");
 }

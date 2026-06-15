@@ -37,7 +37,8 @@ Source (one required):
 Options:
   --questions <file>     Questions file (default: questions.txt)
   --max-videos <n>       Max videos to mine (default: 50)
-  --model <name>         LLM model (default: $LLM_MODEL or gpt-4o-mini)
+  --model <name>         LLM model (default: $LLM_MODEL or gpt-5.5;
+                         use gpt-5.4-mini to cut cost on large channels)
   --min-confidence <n>   Min confidence 0-1 to keep a clip (default: 0.55)
   --token-budget <n>     Transcript tokens per model call (default: 50000)
   --out <dir>            Report output dir (default: data/reports)
@@ -56,7 +57,7 @@ export function parseArgs(argv: string[]): CliConfig | null {
   const config: CliConfig = {
     questionsFile: "questions.txt",
     maxVideos: 50,
-    model: process.env.LLM_MODEL || "gpt-4o-mini",
+    model: process.env.LLM_MODEL || "gpt-5.5",
     minConfidence: 0.55,
     tokenBudget: 50000,
     outDir: "data/reports",

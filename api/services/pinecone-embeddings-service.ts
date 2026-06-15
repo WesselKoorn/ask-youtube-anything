@@ -105,7 +105,8 @@ export class PineconeEmbeddingService {
   }
 
   /**
-   * Embeds an array of strings using the OpenAI Embeddings API (text-embedding-ada-002).
+   * Embeds an array of strings using the OpenAI Embeddings API
+   * (text-embedding-3-large, truncated to 1536 dims for index compatibility).
    * Returns an array of float arrays, one per input text.
    */
   private static async embedTexts(texts: string[]): Promise<number[][]> {
@@ -115,8 +116,11 @@ export class PineconeEmbeddingService {
 
     // The embeddings endpoint can process multiple inputs in one request:
     const response = await openai.embeddings.create({
-      model: "text-embedding-ada-002",
+      model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-large",
       input: texts,
+      // Keep 1536 dims (via Matryoshka truncation) so it stays drop-in
+      // compatible with a Pinecone index originally sized for ada-002.
+      dimensions: 1536,
     });
 
     // Each item in response.data.data corresponds to one embedding

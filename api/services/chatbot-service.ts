@@ -63,9 +63,8 @@ User's question: "${question}"
     const openai = new OpenAI({ apiKey: openAiApiKey });
 
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: process.env.OPENAI_CHAT_MODEL || "gpt-5.5",
       messages: [systemMessage, userMessage],
-      temperature: 0.7, // adjust for creativity
     });
 
     const aiAnswer = response.choices[0].message?.content ?? "No answer";

@@ -74,7 +74,7 @@ Useful options (see `--help` for all):
 | `--questions <file>` | `questions.txt` | Your SEO question list |
 | `--max-videos <n>` | `50` | How many recent videos to mine |
 | `--min-confidence <n>` | `0.55` | Bar for keeping a clip |
-| `--model <name>` | `gpt-4o-mini` | Matching model |
+| `--model <name>` | `gpt-5.5` | Matching model (`gpt-5.4-mini` to economize) |
 
 ## Output
 
@@ -90,7 +90,8 @@ the transcript excerpt so a human can sanity-check it in one click.
 ## Cost & limits
 
 - Embeddings/vector DB: none.
-- LLM: a handful of batched calls (often just one for a small channel). Cheap.
+- LLM: a handful of batched calls (often just one for a small channel). Cost
+  scales with model — `gpt-5.5` for best accuracy, `gpt-5.4-mini` to economize.
 - Transcripts come from YouTube's public caption feed and can be rate-limited
   or missing (captions disabled); those videos are skipped and counted in the
   report. For production, owner-access captions or the original video files are
