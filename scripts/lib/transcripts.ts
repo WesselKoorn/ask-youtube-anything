@@ -154,7 +154,20 @@ export async function loadTranscripts(
 
     if (cached) {
       cachedCount++;
-      return cached;
+      // Cues are the expensive part to cache; refresh metadata from the current
+      // listing so a transcript first cached without a Data API key (where
+      // title falls back to the videoId) picks up the real title on a later
+      // --channel run.
+      const freshTitle =
+        video.title && video.title !== video.videoId
+          ? video.title
+          : cached.title;
+      return {
+        ...cached,
+        title: freshTitle,
+        channelId: video.channelId || cached.channelId,
+        publishedAt: video.publishedAt || cached.publishedAt,
+      };
     }
 
     try {
