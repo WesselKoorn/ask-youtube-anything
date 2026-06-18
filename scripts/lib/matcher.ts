@@ -46,8 +46,16 @@ You are an expert short-form video editor and SEO analyst. You are given
 transcripts of a channel's videos (each line prefixed with its start time in
 seconds) and a list of SEO questions. You find the exact moments where a
 question is directly and substantively answered out loud, so the moment can be
-cut into a short clip. You only report genuine, self-contained answers — never
-passing mentions, intros, or questions that are raised but left unanswered.
+cut into a short clip.
+
+Be strict about precision:
+- The answer must be stated explicitly in the transcript lines themselves.
+  Never infer it or fill it in from outside knowledge.
+- Set startSeconds to the timestamp where the answer actually begins — not the
+  preceding lead-in, setup, or contrast. The cited span must read as the answer.
+- Report only genuine, self-contained answers. If a question is merely alluded
+  to, mentioned in passing, or raised but left unanswered, omit it.
+
 You respond with JSON only.
 `.trim();
 
@@ -122,9 +130,12 @@ clearly and substantively answered. For each match, return:
 - questionIndex: the 1-based number of the question
 - videoId: the VIDEO id the moment comes from (must be one shown above)
 - startSeconds / endSeconds: the answer's boundaries in seconds, taken from the
-  bracketed timestamps; aim for a self-contained 15-75s clip that starts and
-  ends on a complete thought
-- confidence: 0-1, how directly and completely the moment answers the question
+  bracketed timestamps. startSeconds MUST be where the answer itself begins (not
+  the lead-in); aim for a self-contained 15-75s clip that starts and ends on a
+  complete thought
+- confidence: 0-1, how directly the CITED LINES THEMSELVES answer the question.
+  If the answer is only implied, or the lines are mostly setup, score below 0.6
+  or omit the match entirely
 - clipTitle: a punchy, SEO-friendly title for the clip
 - answerSummary: one sentence summarizing the answer
 

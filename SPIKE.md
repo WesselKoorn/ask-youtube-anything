@@ -40,6 +40,15 @@ All LLM calls go through `scripts/lib/llm.ts`. Switching from OpenAI to Claude
 or another provider means reimplementing that one function — nothing else
 changes.
 
+gpt-5.5 is good at *locating* topics but can anchor the timestamp on the lead-in
+and over-state confidence, so the linked excerpt doesn't always read as the
+answer. A verification pass that re-checks each match against the transcript and
+re-times it to the spoken answer markedly improves quality — ideally with a
+stronger model (e.g. Claude Opus 4.8, which needs `ANTHROPIC_API_KEY`).
+`scripts/review-bundle.ts` extracts each match with surrounding context for
+review; `scripts/apply-verify.ts` applies the verified decisions
+(`verify-decisions.json`) back into `clip-report.json`.
+
 ## Setup
 
 ```bash

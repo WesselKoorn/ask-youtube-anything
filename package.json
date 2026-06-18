@@ -9,7 +9,9 @@
     "lint": "next lint",
     "find-clips": "tsx scripts/find-clips.ts",
     "render-clips": "tsx scripts/render-clips.ts",
-    "report-html": "tsx scripts/report-html.ts"
+    "report-html": "tsx scripts/report-html.ts",
+    "review-bundle": "tsx scripts/review-bundle.ts",
+    "apply-verify": "tsx scripts/apply-verify.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
