@@ -87,6 +87,10 @@ Useful options (see `--help` for all):
 - `data/transcripts/<videoId>.md` — same, human-readable.
 - `data/reports/clip-report.md` — ranked, readable report (open this).
 - `data/reports/clip-report.json` — structured handoff for the clipping phase.
+- `data/reports/clip-report.html` — concise, categorized overview to share with
+  a client (`npm run report-html`; print to PDF from any browser, or via
+  headless Chrome `--print-to-pdf`). Groups questions by the `## ` headers in
+  `questions.txt` and flags answered / partial / gap per question.
 
 The report opens with a **coverage** line (how many questions got a confident
 answer) and a per-question table, then lists each clip with its deep-link and

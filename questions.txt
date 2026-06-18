@@ -1,14 +1,66 @@
-# SEO questions to find answers for, one per line.
-# Lines starting with "#" and blank lines are ignored.
-# Replace these with the client's real keyword/prompt list.
+# TrueDialog YouTube Question Bank
+# SEO questions to find answers for. Lines starting with "#" are ignored by the
+# matcher. "## " lines mark categories — ignored by the matcher too, but the
+# HTML/PDF report generator uses them to group the overview.
 
-What is RCS?
-How to set up RCS
-What is the difference between RCS and SMS?
-Is RCS secure?
+## RCS (gaps & deeper dives)
 Will RCS replace SMS?
 How do I switch from RCS back to SMS?
-What is RCS Business Messaging?
-Why isn't my RCS working?
-What are the benefits of RCS for businesses?
-How much does RCS messaging cost?
+What is an RCS agent?
+What is an RCS fallback message?
+How does RCS opt-out work?
+What carriers support RCS in the US?
+Does RCS work on iPhone?
+What is the character limit for RCS messages?
+How many cards can an RCS carousel have?
+Can you send video in an RCS message?
+What is conversation-based RCS pricing?
+How long does RCS agent registration take?
+What documents do you need to register an RCS agent?
+Can one company have multiple RCS agents?
+What is the difference between RCS and RBM?
+How do you A/B test RCS messages?
+Can RCS messages trigger calendar or payment actions?
+
+## SMS Fundamentals
+What is 10DLC and why does it matter?
+What is the difference between a short code and a long code?
+What is A2P messaging?
+How do I register a 10DLC campaign?
+What are TCPA compliance requirements for text messaging?
+How do I build an SMS subscriber list legally?
+What is a double opt-in for SMS?
+How do I handle SMS opt-outs?
+What is an SMS fallback?
+How many characters can an SMS message be?
+
+## Marketing & Sales Use Cases
+How do businesses use SMS for marketing campaigns?
+How can SMS improve sales pipeline?
+How do I use text messaging for abandoned cart recovery?
+What is the open rate of SMS vs email?
+How do I use SMS for customer re-engagement?
+How do I measure the ROI of text message marketing?
+What types of calls to action work best in text messages?
+How do I personalize SMS messages at scale?
+
+## Alerts, Notifications & Customer Service
+How do businesses use SMS for alerts and notifications?
+How can companies use text messaging for customer service?
+What is two-way SMS messaging?
+How does SMS work for appointment reminders?
+
+## Industry-Specific
+How do universities use text messaging to communicate with students?
+How do sports teams use SMS or RCS for fan engagement?
+How does SMS work in healthcare for patient communication?
+How do financial services companies use text messaging?
+How can B2B software companies use SMS for sales?
+How do companies use SMS for employee communications?
+
+## Platform & Integrations
+How does TrueDialog integrate with Salesforce?
+How does TrueDialog integrate with HubSpot?
+What analytics does TrueDialog's platform provide?
+How does TrueDialog handle compliance at enterprise scale?
+What makes an enterprise SMS platform different from a basic texting tool?
