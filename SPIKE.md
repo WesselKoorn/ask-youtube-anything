@@ -49,6 +49,17 @@ stronger model (e.g. Claude Opus 4.8, which needs `ANTHROPIC_API_KEY`).
 review; `scripts/apply-verify.ts` applies the verified decisions
 (`verify-decisions.json`) back into `clip-report.json`.
 
+### Retrieval-based matching (v2)
+
+Stuffing every transcript plus every query into one LLM call is imprecise. The
+stronger design embeds transcript **chunks** (`npm run embed-transcripts` →
+`text-embedding-3-large`, cached under `data/index/`) and retrieves the few most
+similar chunks for a query — a verifier then confirms the pick. Same engine
+powers **blog → clip** matching: `npm run match-blog` ranks every blog article
+(scraped via the Yoast sitemap) against the chunks, and `npm run blog-full-report`
+renders the verified picks. The unmatched articles are content gaps — the input
+to the reverse direction (video topics with no blog → new posts).
+
 ## Setup
 
 ```bash

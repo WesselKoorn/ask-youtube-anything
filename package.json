@@ -11,7 +11,12 @@
     "render-clips": "tsx scripts/render-clips.ts",
     "report-html": "tsx scripts/report-html.ts",
     "review-bundle": "tsx scripts/review-bundle.ts",
-    "apply-verify": "tsx scripts/apply-verify.ts"
+    "apply-verify": "tsx scripts/apply-verify.ts",
+    "embed-transcripts": "tsx scripts/embed-transcripts.ts",
+    "match-articles": "tsx scripts/match-articles.ts",
+    "match-blog": "tsx scripts/match-blog.ts",
+    "blog-report": "tsx scripts/blog-report.ts",
+    "blog-full-report": "tsx scripts/blog-full-report.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
