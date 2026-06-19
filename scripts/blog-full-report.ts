@@ -70,7 +70,7 @@ h2{ font-size:16px; margin:26px 0 10px; }
 `;
 
 async function main(): Promise<void> {
-  const picks: Record<string, Pick> = JSON.parse(await fs.readFile("data/blog/picks-full.json", "utf8"));
+  const picks: Record<string, Pick> = JSON.parse(await fs.readFile("blog-picks.json", "utf8"));
   const match: MatchRow[] = JSON.parse(await fs.readFile("data/blog/_match.json", "utf8"));
   const bySlug = new Map(match.map((m) => [m.slug, m]));
   const totalArticles = (await fs.readFile("data/blog/urls.txt", "utf8")).split("\n").filter(Boolean).length;
