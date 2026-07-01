@@ -34,6 +34,36 @@ export async function getChannelId(channelUrl: string): Promise<string> {
 }
 
 /**
+ * Fetch the transcript for a single YouTube video URL, e.g.:
+ *   https://www.youtube.com/watch?v=dQw4w9WgXcQ
+ */
+export async function getVideoTranscript(videoUrl: string): Promise<string> {
+  try {
+    if (!videoUrl) {
+      throw new Error("Video URL is required");
+    }
+
+    const videoId = YoutubeService.extractVideoIdFromUrl(videoUrl);
+
+    if (!videoId) {
+      throw new Error(`Could not parse a video ID from URL: ${videoUrl}`);
+    }
+
+    const transcript = await YoutubeService.getTranscript(videoId);
+
+    if (!transcript) {
+      throw new Error("No transcript is available for this video");
+    }
+
+    return transcript;
+  } catch (error) {
+    console.error(error);
+
+    throw error;
+  }
+}
+
+/**
  * Main function to get the 10 latest videos from a channel URL like:
  *   https://www.youtube.com/@AlexHormozi/featured
  */

@@ -4,6 +4,7 @@ import styles from "./analyze-channel-form.module.scss";
 
 import { analyzeChannel } from "app/actions";
 import { useState } from "react";
+import Link from "next/link";
 import SubmitButton from "@components/submit-button";
 
 export default function AnalyzeChannelForm() {
@@ -39,6 +40,9 @@ export default function AnalyzeChannelForm() {
           {error}
         </p>
       )}
+      <p className={styles.description}>
+        Just need the words? <Link href="/transcript">Get a video transcript</Link>
+      </p>
     </div>
   );
 }
