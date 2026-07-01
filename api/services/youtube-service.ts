@@ -1,3 +1,4 @@
+import { TranscriptSegment } from "@models/transcript-segment";
 import { YoutubeVideo } from "@models/youtube-video";
 import { YoutubeTranscript } from "youtube-transcript";
 
@@ -24,6 +25,46 @@ export class YoutubeService {
 
       // Remove the "@" symbol
       return handlePart.replace("@", "");
+    } catch (error) {
+      console.error(error);
+
+      return null; // Invalid URL or unexpected format
+    }
+  }
+
+  /**
+   * Extract the video ID from a YouTube video URL. Supports the common formats:
+   *   https://www.youtube.com/watch?v=VIDEO_ID
+   *   https://youtu.be/VIDEO_ID
+   *   https://www.youtube.com/shorts/VIDEO_ID
+   *   https://www.youtube.com/embed/VIDEO_ID
+   * Returns null if no video ID could be parsed.
+   */
+  static extractVideoIdFromUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url.trim());
+
+      // youtu.be/VIDEO_ID
+      if (urlObj.hostname === "youtu.be") {
+        return urlObj.pathname.slice(1).split("/")[0] || null;
+      }
+
+      // youtube.com/watch?v=VIDEO_ID
+      const videoIdParam = urlObj.searchParams.get("v");
+      if (videoIdParam) {
+        return videoIdParam;
+      }
+
+      // youtube.com/shorts/VIDEO_ID or youtube.com/embed/VIDEO_ID
+      const pathParts = urlObj.pathname.split("/").filter(Boolean);
+      const prefixIndex = pathParts.findIndex(
+        (part) => part === "shorts" || part === "embed"
+      );
+      if (prefixIndex !== -1 && pathParts[prefixIndex + 1]) {
+        return pathParts[prefixIndex + 1];
+      }
+
+      return null;
     } catch (error) {
       console.error(error);
 
@@ -178,6 +219,21 @@ export class YoutubeService {
     const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
 
     return transcriptionArray.map((item) => item.text).join(" ");
+  }
+
+  /**
+   * Fetch the transcript as timestamped segments (offset in ms + text),
+   * so callers can render either plain text or a timestamped view.
+   */
+  static async getTranscriptSegments(
+    videoId: string
+  ): Promise<TranscriptSegment[]> {
+    const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
+
+    return transcriptionArray.map((item) => ({
+      offset: item.offset,
+      text: item.text,
+    }));
   }
 
   /**

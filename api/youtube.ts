@@ -1,6 +1,7 @@
 "use server";
 
 import { YoutubeService } from "@api/services/youtube-service";
+import { TranscriptSegment } from "@models/transcript-segment";
 import { YoutubeVideo } from "@models/youtube-video";
 
 const MAX_VIDEOS = 100;
@@ -26,6 +27,48 @@ export async function getChannelId(channelUrl: string): Promise<string> {
     }
 
     return channelId;
+  } catch (error) {
+    console.error(error);
+
+    throw error;
+  }
+}
+
+/**
+ * Fetch the transcript for a single YouTube video URL, e.g.:
+ *   https://www.youtube.com/watch?v=dQw4w9WgXcQ
+ */
+export async function getVideoTranscript(
+  videoUrl: string
+): Promise<TranscriptSegment[]> {
+  try {
+    if (!videoUrl) {
+      throw new Error("Video URL is required");
+    }
+
+    const videoId = YoutubeService.extractVideoIdFromUrl(videoUrl);
+
+    if (!videoId) {
+      throw new Error(`Could not parse a video ID from URL: ${videoUrl}`);
+    }
+
+    let segments: TranscriptSegment[];
+    try {
+      segments = await YoutubeService.getTranscriptSegments(videoId);
+    } catch {
+      // youtube-transcript throws when captions are disabled or missing.
+      throw new Error(
+        "This video doesn't have a transcript available. The uploader may have disabled captions."
+      );
+    }
+
+    if (segments.length === 0) {
+      throw new Error(
+        "This video doesn't have a transcript available. The uploader may have disabled captions."
+      );
+    }
+
+    return segments;
   } catch (error) {
     console.error(error);
 

@@ -14,6 +14,11 @@
   text-align: center;
   font-size: 16px;
   color: var(--gray-alpha-500);
+
+  a {
+    color: var(--foreground);
+    text-decoration: underline;
+  }
 }
 
 .form {
