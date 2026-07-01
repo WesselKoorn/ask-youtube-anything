@@ -55,11 +55,41 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .resultTitle {
   font-size: 16px;
   font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle {
+  display: flex;
+  border-radius: 8px;
+  background-color: var(--gray-alpha-200);
+  padding: 2px;
+
+  button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background-color: transparent;
+    color: var(--gray-alpha-500);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+}
+
+.toggleActive {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
 }
 
 .copyButton {
@@ -79,4 +109,27 @@
   line-height: 1.6;
   color: var(--foreground);
   white-space: pre-wrap;
+}
+
+.segments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.segment {
+  display: flex;
+  gap: 12px;
+}
+
+.timestamp {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-alpha-500);
+  font-size: 13px;
+  padding-top: 1px;
+  min-width: 44px;
 }

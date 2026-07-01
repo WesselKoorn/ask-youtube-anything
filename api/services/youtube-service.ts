@@ -1,3 +1,4 @@
+import { TranscriptSegment } from "@models/transcript-segment";
 import { YoutubeVideo } from "@models/youtube-video";
 import { YoutubeTranscript } from "youtube-transcript";
 
@@ -218,6 +219,21 @@ export class YoutubeService {
     const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
 
     return transcriptionArray.map((item) => item.text).join(" ");
+  }
+
+  /**
+   * Fetch the transcript as timestamped segments (offset in ms + text),
+   * so callers can render either plain text or a timestamped view.
+   */
+  static async getTranscriptSegments(
+    videoId: string
+  ): Promise<TranscriptSegment[]> {
+    const transcriptionArray = await YoutubeTranscript.fetchTranscript(videoId);
+
+    return transcriptionArray.map((item) => ({
+      offset: item.offset,
+      text: item.text,
+    }));
   }
 
   /**
