@@ -95,7 +95,7 @@ export class PineconeEmbeddingService {
         })),
       };
 
-      await index.upsert(upsertRequest.vectors);
+      await index.upsert({ records: upsertRequest.vectors });
 
       console.log(
         `Upserted ${upsertRequest.vectors.length} chunks (batch: ${batchIndex} - ${end})`
@@ -181,7 +181,7 @@ export class PineconeEmbeddingService {
     while (i < chunkIds.length) {
       const ids = chunkIds.slice(i, i + batchSize);
 
-      const fetchResponse = await index.fetch(ids);
+      const fetchResponse = await index.fetch({ ids });
       const foundIds = new Set(Object.keys(fetchResponse.records ?? {}));
 
       // for each chunk in this slice, if ID wasn't found in Pinecone, it's new
